@@ -1,0 +1,34 @@
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Logs
+logs/
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+
+# Build directories
+dist/
+build/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+
+# Dependency directories
+bower_components/
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Miscellaneous
+*.bak
+*.tmp
