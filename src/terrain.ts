@@ -73,7 +73,7 @@ export class Terrain {
                             context.fillStyle = 'blue';
                             break;
                         case 'uranium':
-                            context.fillStyle = 'yellow';
+                            context.fillStyle = '#00FF00'; // Changed to green
                             break;
                         case 'lava':
                             context.fillStyle = 'red';

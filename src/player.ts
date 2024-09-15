@@ -1,8 +1,8 @@
 import { Terrain } from './terrain';
 
 export class Player {
-    private x: number;
-    private y: number;
+    protected x: number;
+    protected y: number;
     private size: number;
     private health: number;
     private shield: number;
@@ -12,8 +12,9 @@ export class Player {
     private minSpeed: number = 0.5; // Reduced minimum speed
     private maxSpeed: number = 5; // Reduced maximum speed
     private optimalSize: number = 40; // Size at which the player is fastest
-    private ringRotation: number = 0; // New property to track ring rotation
+    protected ringRotation: number = 0; // Change from private to protected
     protected terrain: Terrain; // Add this line
+    private score: number = 0; // Add this line
 
     constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D, terrain: Terrain) {
         this.x = x;
@@ -157,6 +158,29 @@ export class Player {
         this.context.beginPath();
         this.context.arc(this.x, this.y + this.size / 8, this.size / 5, 0.2 * Math.PI, 0.8 * Math.PI);
         this.context.stroke();
+
+        // Draw combined health and shield bar
+        const barWidth = this.size * 2;
+        const barHeight = 5;
+        const healthPercentage = this.health / 100;
+        const shieldPercentage = this.shield / 100;
+
+        // Background (red)
+        this.context.fillStyle = 'red';
+        this.context.fillRect(this.x - barWidth / 2, this.y - this.size / 2 - 10, barWidth, barHeight);
+
+        // Health (green)
+        this.context.fillStyle = 'green';
+        this.context.fillRect(this.x - barWidth / 2, this.y - this.size / 2 - 10, barWidth * healthPercentage, barHeight);
+
+        // Shield (blue)
+        this.context.fillStyle = 'blue';
+        this.context.fillRect(
+            this.x - barWidth / 2 + barWidth * healthPercentage, 
+            this.y - this.size / 2 - 10, 
+            barWidth * shieldPercentage, 
+            barHeight
+        );
     }
 
     getX() { return this.x; }
@@ -195,5 +219,13 @@ export class Player {
         if (this.ringRotation >= Math.PI * 2) {
             this.ringRotation -= Math.PI * 2;
         }
+    }
+
+    public getScore(): number {
+        return this.score;
+    }
+
+    public adjustScore(amount: number) {
+        this.score += amount;
     }
 }

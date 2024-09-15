@@ -13,19 +13,20 @@ export class Game {
     private cameraY: number;
     private lastHealthRecoveryTime: number;
     private enemies: Enemy[] = [];
+    private maxEnemies: number = 40; // Changed from 20 to 40
 
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         this.context = this.canvas.getContext('2d')!;
-        this.terrain = new Terrain(2000, 2000); // Larger terrain size
-        this.player = new Player(400, 300, 100, 10, this.context, this.terrain); // Pass terrain here
+        this.terrain = new Terrain(10000, 10000); // Increased terrain size to 10000x10000
+        this.player = new Player(5000, 5000, 100, 10, this.context, this.terrain); // Start player in the middle
         this.score = 0;
         this.keysPressed = new Set();
         this.cameraX = 0;
         this.cameraY = 0;
         this.lastHealthRecoveryTime = Date.now();
         this.enemies = [];
-        this.spawnEnemies(5); // Spawn 5 initial enemies
+        this.spawnEnemies(20); // Increased initial spawn from 15 to 20
 
         this.init();
     }
@@ -110,14 +111,22 @@ export class Game {
                     this.enemies.splice(index, 1);
                 } else {
                     // Enemy wins
-                    this.player.adjustHealth(-10);
+                    const damage = Math.floor(enemy.getSize() / 10); // Calculate damage based on enemy size
+                    this.player.adjustHealth(-damage); // Deal damage to player
+                    
+                    // Optional: Make the enemy bounce away after dealing damage
+                    const bounceDistance = 20;
+                    const bounceX = enemy.getX() + (dx / distance) * bounceDistance;
+                    const bounceY = enemy.getY() + (dy / distance) * bounceDistance;
+                    enemy.setPosition(bounceX, bounceY);
                 }
             }
         });
 
         // Spawn new enemies if needed
-        if (this.enemies.length < 5) {
-            this.spawnEnemies(1);
+        if (this.enemies.length < this.maxEnemies) {
+            const enemiesToSpawn = Math.min(5, this.maxEnemies - this.enemies.length); // Increased from 3 to 5
+            this.spawnEnemies(enemiesToSpawn);
         }
     }
 
@@ -161,26 +170,12 @@ export class Game {
         this.context.restore();
 
         this.drawScore();
-        this.drawHealth();
-        this.drawShield();
     }
 
     private drawScore() {
         this.context.fillStyle = 'white'; // Change score text color to white
         this.context.font = '20px Arial';
         this.context.fillText(`Score: ${this.score}`, 10, 20);
-    }
-
-    private drawHealth() {
-        this.context.fillStyle = 'white'; // Change health text color to white
-        this.context.font = '20px Arial';
-        this.context.fillText(`Health: ${this.player.getHealth()}`, 10, 50);
-    }
-
-    private drawShield() {
-        this.context.fillStyle = 'white'; // Change shield text color to white
-        this.context.font = '20px Arial';
-        this.context.fillText(`Shield: ${this.player.getShield()}`, 10, 80);
     }
 
     private spawnEnemies(count: number) {
