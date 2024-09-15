@@ -8,14 +8,15 @@ export class Player {
     private shield: number;
     private context: CanvasRenderingContext2D;
     private movementDirection: { x: number, y: number } = { x: 0, y: 0 };
-    private baseSpeed: number = 4; // Reduced from 6 to 4 for slightly slower movement
-    private minSpeed: number = 0.5; // Reduced minimum speed
+    private baseSpeed: number = 4; // Increased slightly from 3 to 4
+    private minSpeed: number = 0.3; // Decreased from 0.5 to 0.3
     private maxSpeed: number = 5; // Reduced maximum speed
     private optimalSize: number = 40; // Size at which the player is fastest
     protected ringRotation: number = 0; // Change from private to protected
     protected terrain: Terrain; // Add this line
     private score: number = 0; // Add this line
     private _isDigging: boolean = false; // Changed from isDigging to _isDigging
+    private maxSize: number = 1000; // Changed from 100 to 1000
 
     constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D, terrain: Terrain) {
         this.x = x;
@@ -48,10 +49,12 @@ export class Player {
     }
 
     // Calculate speed based on size
-    protected getSpeed(): number {
+    public getSpeed(): number {
         const minSize = 20;
-        const speedDecrease = Math.pow((this.size - minSize) / 20, 1.5); // More rapid speed decrease
-        return Math.max(this.minSpeed, this.baseSpeed - speedDecrease);
+        const normalizedSize = Math.min((this.size - minSize) / (this.maxSize - minSize), 1);
+        const speedDecrease = normalizedSize * 0.95; // Increased from 0.8 to 0.95 for more significant slowdown at larger sizes
+        const speed = this.baseSpeed - this.baseSpeed * speedDecrease;
+        return Math.max(this.minSpeed, speed);
     }
 
     dig(terrain: Terrain) {
@@ -72,13 +75,13 @@ export class Player {
         // Handle dug blocks
         for (const block of dugBlocks) {
             if (block.type === 'uranium') {
-                this.adjustScore(-5);
+                this.adjustHealth(-5);
             } else if (block.type === 'lava') {
                 this.adjustHealth(-20);
             } else if (block.type === 'quartz') {
                 this.adjustShield(10);
             } else {
-                this.adjustScore(1);
+                this.adjustScore(1); // Increase score for regular blocks
             }
         }
 
@@ -220,8 +223,15 @@ export class Player {
 
     setSize(score: number) {
         const minSize = 20;
-        const growthRate = 0.015; // Slightly reduced growth rate
-        this.size = Math.max(minSize, minSize + score * growthRate);
+        const growthFactor = 1.5; // Increased from 0.5 to 1.5 to allow for larger growth
+
+        // Calculate new size based on score
+        const newSize = minSize + Math.sqrt(score) * growthFactor;
+
+        // Clamp the size between minSize and maxSize
+        this.size = Math.max(minSize, Math.min(this.maxSize, newSize));
+        
+        console.log(`Player size updated. Score: ${score}, New size: ${this.size}`);
     }
 
     public getSize(): number {
@@ -245,6 +255,8 @@ export class Player {
 
     public adjustScore(amount: number) {
         this.score += amount;
+        this.setSize(this.score);
+        console.log(`Score adjusted. New score: ${this.score}`); // Add this line for debugging
     }
 
     public startDigging() {
@@ -263,20 +275,13 @@ export class Player {
 
     public update(terrain: Terrain, screenWidth: number, screenHeight: number, cameraX: number, cameraY: number) {
         if (this._isDigging) {
-            const dugBlocks = this.dig(terrain);
-            console.log(`Dug ${dugBlocks.length} blocks`);
-            for (const block of dugBlocks) {
-                if (block.type === 'uranium') {
-                    this.adjustScore(-5);
-                } else if (block.type === 'lava') {
-                    this.adjustHealth(-20);
-                } else if (block.type === 'quartz') {
-                    this.adjustShield(10);
-                } else {
-                    this.adjustScore(1);
-                }
-            }
-            this.setSize(this.getScore());
+            this.dig(terrain);
         }
+    }
+
+    // Add a new method to handle enemy kills
+    public onEnemyKill() {
+        this.adjustScore(1); // Increase score by 1 for each enemy killed
+        this.setSize(this.getScore());
     }
 }

@@ -9,6 +9,7 @@ export class Terrain {
     private width: number;
     private height: number;
     private blocks: Block[][];
+    private dugColor: string = '#3D2817'; // Dark brown color for dug areas
 
     constructor(width: number, height: number) {
         this.width = width;
@@ -26,23 +27,28 @@ export class Terrain {
             blocks.push(row);
         }
 
-        // Generate clusters of diamond, uranium, lava, and quartz
-        this.generateClusters(blocks, 'diamond', 0.0001, 5); // 0.01% chance, cluster size 5
-        this.generateClusters(blocks, 'uranium', 0.00005, 3); // 0.005% chance, cluster size 3
-        this.generateClusters(blocks, 'lava', 0.0002, 4); // 0.02% chance, cluster size 4
-        this.generateClusters(blocks, 'quartz', 0.0001, 5); // 0.01% chance, cluster size 5
+        // Generate clusters of diamond, uranium, lava, and quartz with random sizes
+        this.generateClusters(blocks, 'diamond', 0.0001, 3, 7); // 0.01% chance, cluster size 3-7
+        this.generateClusters(blocks, 'uranium', 0.00005, 2, 5); // 0.005% chance, cluster size 2-5
+        this.generateClusters(blocks, 'lava', 0.0002, 3, 6); // 0.02% chance, cluster size 3-6
+        this.generateClusters(blocks, 'quartz', 0.0001, 3, 7); // 0.01% chance, cluster size 3-7
 
         return blocks;
     }
 
-    private generateClusters(blocks: Block[][], type: BlockType, chance: number, clusterSize: number) {
+    private generateClusters(blocks: Block[][], type: BlockType, chance: number, minSize: number, maxSize: number) {
         for (let i = 0; i < blocks.length; i++) {
             for (let j = 0; j < blocks[i].length; j++) {
                 if (Math.random() < chance) {
+                    const clusterSize = this.getRandomClusterSize(minSize, maxSize);
                     this.createCluster(blocks, i, j, type, clusterSize);
                 }
             }
         }
+    }
+
+    private getRandomClusterSize(min: number, max: number): number {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
     private createCluster(blocks: Block[][], x: number, y: number, type: BlockType, size: number) {
@@ -53,55 +59,77 @@ export class Terrain {
                     const i = x + dx;
                     const j = y + dy;
                     if (i >= 0 && i < blocks.length && j >= 0 && j < blocks[i].length) {
-                        blocks[i][j] = { type, present: true };
+                        // Use noise to determine if this block should be part of the cluster
+                        if (this.noise(i, j, size) > 0.5) {
+                            blocks[i][j] = { type, present: true };
+                        }
                     }
                 }
             }
         }
     }
 
+    private noise(x: number, y: number, size: number): number {
+        // Simple noise function, you can replace this with a more sophisticated one if needed
+        const value = Math.sin(x * 0.1) + Math.sin(y * 0.1) + Math.sin((x + y) * 0.1);
+        return (Math.sin(value * size) + 1) / 2; // Normalize to 0-1 range
+    }
+
     public generateTerrain(context: CanvasRenderingContext2D, startX: number, startY: number, endX: number, endY: number) {
-        for (let i = startX; i < endX && i < this.blocks.length; i++) {
-            for (let j = startY; j < endY && j < this.blocks[i].length; j++) {
-                const block = this.blocks[i][j];
-                if (block.present) {
-                    switch (block.type) {
-                        case 'dirt':
-                            context.fillStyle = '#8B4513'; // Brown color
-                            break;
-                        case 'diamond':
-                            context.fillStyle = 'blue';
-                            break;
-                        case 'uranium':
-                            context.fillStyle = '#00FF00'; // Changed to green
-                            break;
-                        case 'lava':
-                            context.fillStyle = 'red';
-                            break;
-                        case 'quartz':
-                            context.fillStyle = 'white';
-                            break;
-                    }
-                } else {
-                    context.fillStyle = '#5C4033'; // Darker brown for dug areas
+        // Ensure we're not trying to access blocks outside the terrain
+        startX = Math.max(0, startX);
+        startY = Math.max(0, startY);
+        endX = Math.min(this.width / 10, endX);
+        endY = Math.min(this.height / 10, endY);
+
+        for (let x = startX; x < endX; x++) {
+            for (let y = startY; y < endY; y++) {
+                if (!this.blocks[x]) {
+                    this.blocks[x] = [];
                 }
-                context.fillRect(i * 10, j * 10, 10, 10);
+                if (!this.blocks[x][y]) {
+                    this.blocks[x][y] = this.generateBlock(x, y);
+                }
+                const block = this.blocks[x][y];
+                if (block) {
+                    context.fillStyle = block.present ? this.getBlockColor(block.type) : this.dugColor;
+                    context.fillRect(x * 10, y * 10, 10, 10);
+                }
             }
         }
     }
 
     public removeBlock(x: number, y: number): Block | null {
-        const i = Math.floor(x / 10);
-        const j = Math.floor(y / 10);
-        if (i >= 0 && i < this.blocks.length && j >= 0 && j < this.blocks[i].length) {
-            const block = this.blocks[i][j];
-            if (block.present) {
-                block.present = false;
-                console.log(`Removed block at (${i}, ${j}), type: ${block.type}`);
-                return block; // Return the removed block
-            }
+        const blockX = Math.floor(x / 10);
+        const blockY = Math.floor(y / 10);
+        if (this.blocks[blockX] && this.blocks[blockX][blockY] && this.blocks[blockX][blockY].present) {
+            const block = this.blocks[blockX][blockY];
+            this.blocks[blockX][blockY] = { ...block, present: false };
+            return block;
         }
-        return null; // No block was removed
+        return null;
+    }
+
+    private generateBlock(x: number, y: number): Block {
+        // You can implement more complex logic here if needed
+        return { type: 'dirt', present: true };
+    }
+
+    private getBlockColor(type: BlockType): string {
+        switch (type) {
+            case 'dirt':
+                return '#8B4513'; // Saddle Brown
+            case 'diamond':
+                return '#00FFFF'; // Cyan
+            case 'uranium':
+                return '#32CD32'; // Lime Green
+            case 'lava':
+                return '#FF4500'; // Orange Red
+            case 'quartz':
+                return '#F0F8FF'; // Alice Blue
+            default:
+                return '#A9A9A9'; // Dark Gray
+        }
     }
 
     getWidth(): number {

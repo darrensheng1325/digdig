@@ -15,6 +15,10 @@ export class Game {
     private enemies: Enemy[] = [];
     private maxEnemies: number = 40; // Changed from 20 to 40
     private isMouseControl: boolean = false;
+    private zoom: number = 1;
+    private minZoom: number = 0.01; // Minimum zoom (maximum zoom out)
+    private maxZoom: number = 1; // Maximum zoom (no zoom out)
+    private zoomCap: number = 0.4; // Set the zoom cap to 40%
 
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -64,7 +68,10 @@ export class Game {
             const dy = y - this.player.getY();
             const distance = Math.sqrt(dx * dx + dy * dy);
             if (distance > 5) {  // Add a small threshold to prevent jittering
-                this.player.move(dx / distance * 5, dy / distance * 5);
+                const speed = this.player.getSpeed();
+                const moveX = (dx / distance) * speed;
+                const moveY = (dy / distance) * speed;
+                this.player.move(moveX, moveY);
             }
         }
     }
@@ -99,7 +106,8 @@ export class Game {
             if (this.keysPressed.has('ArrowRight')) dx += 1;
 
             if (dx !== 0 || dy !== 0) {
-                this.player.move(dx, dy);
+                const speed = this.player.getSpeed();
+                this.player.move(dx * speed, dy * speed);
             }
         }
 
@@ -116,9 +124,14 @@ export class Game {
             this.lastHealthRecoveryTime = currentTime;
         }
 
+        // Update zoom based on player size
+        this.updateZoom();
+
         // Update camera position to follow the player, but limit it to terrain boundaries
-        this.cameraX = Math.max(0, Math.min(this.terrain.getWidth() - this.canvas.width, this.player.getX() - this.canvas.width / 2));
-        this.cameraY = Math.max(0, Math.min(this.terrain.getHeight() - this.canvas.height, this.player.getY() - this.canvas.height / 2));
+        const effectiveWidth = this.canvas.width / this.zoom;
+        const effectiveHeight = this.canvas.height / this.zoom;
+        this.cameraX = Math.max(0, Math.min(this.terrain.getWidth() - effectiveWidth, this.player.getX() - effectiveWidth / 2));
+        this.cameraY = Math.max(0, Math.min(this.terrain.getHeight() - effectiveHeight, this.player.getY() - effectiveHeight / 2));
 
         // Update enemies
         this.enemies.forEach((enemy, index) => {
@@ -133,7 +146,9 @@ export class Game {
                 // Collision detected
                 if (this.player.getSize() > enemy.getSize()) {
                     // Player wins
-                    this.score += Math.floor(enemy.getSize());
+                    const scoreIncrease = Math.floor(enemy.getSize());
+                    this.player.adjustScore(scoreIncrease);
+                    console.log(`Player defeated enemy. Score increase: ${scoreIncrease}`); // Add this line for debugging
                     this.enemies.splice(index, 1);
                 } else {
                     // Enemy wins
@@ -154,6 +169,25 @@ export class Game {
             const enemiesToSpawn = Math.min(5, this.maxEnemies - this.enemies.length); // Increased from 3 to 5
             this.spawnEnemies(enemiesToSpawn);
         }
+    }
+
+    private updateZoom() {
+        const playerSize = this.player.getSize();
+        const minPlayerSize = 20;
+        const maxPlayerSize = 1000;
+        
+        // Calculate zoom factor based on player size using a logarithmic function
+        const zoomFactor = Math.log(playerSize / minPlayerSize) / Math.log(maxPlayerSize / minPlayerSize);
+        let newZoom = this.maxZoom * Math.pow(0.05, zoomFactor);
+        
+        // Apply the zoom cap
+        newZoom = Math.max(this.zoomCap, newZoom);
+        
+        // Smooth transition to the new zoom level
+        this.zoom = this.zoom * 0.9 + newZoom * 0.1;
+        
+        // Clamp zoom between minZoom and maxZoom
+        this.zoom = Math.max(this.minZoom, Math.min(this.maxZoom, this.zoom));
     }
 
     private checkCollisions() {
@@ -177,31 +211,42 @@ export class Game {
     }
 
     private render() {
-        // Clear only the visible part of the canvas
+        // Clear the entire canvas
         this.context.fillStyle = 'black';
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         this.context.save();
-        this.context.translate(-this.cameraX, -this.cameraY);
         
-        // Only render the visible part of the terrain
-        const startX = Math.floor(this.cameraX / 10);
-        const startY = Math.floor(this.cameraY / 10);
-        const endX = Math.ceil((this.cameraX + this.canvas.width) / 10);
-        const endY = Math.ceil((this.cameraY + this.canvas.height) / 10);
+        // Apply zoom and translation
+        this.context.scale(this.zoom, this.zoom);
+        
+        // Adjust translation to keep player centered
+        const centerX = this.canvas.width / (2 * this.zoom);
+        const centerY = this.canvas.height / (2 * this.zoom);
+        this.context.translate(centerX - this.player.getX(), centerY - this.player.getY());
+        
+        // Calculate visible area
+        const visibleWidth = this.canvas.width / this.zoom;
+        const visibleHeight = this.canvas.height / this.zoom;
+        const startX = Math.floor((this.player.getX() - visibleWidth / 2) / 10);
+        const startY = Math.floor((this.player.getY() - visibleHeight / 2) / 10);
+        const endX = Math.ceil((this.player.getX() + visibleWidth / 2) / 10);
+        const endY = Math.ceil((this.player.getY() + visibleHeight / 2) / 10);
         
         this.terrain.generateTerrain(this.context, startX, startY, endX, endY);
         this.enemies.forEach(enemy => enemy.draw());
         this.player.draw();
+        
         this.context.restore();
 
         this.drawScore();
     }
 
     private drawScore() {
-        this.context.fillStyle = 'white'; // Change score text color to white
+        this.context.fillStyle = 'white';
         this.context.font = '20px Arial';
-        this.context.fillText(`Score: ${this.score}`, 10, 20);
+        this.context.fillText(`Score: ${this.player.getScore()}`, 10, 30);
+        this.context.fillText(`Zoom: ${this.zoom.toFixed(2)}`, 10, 60);
     }
 
     private spawnEnemies(count: number) {

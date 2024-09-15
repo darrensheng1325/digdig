@@ -12,8 +12,8 @@ export class Enemy extends Player {
         this.setSize(20); // Set initial size
     }
 
-    // Override the getSpeed method to make enemies much slower
-    protected getSpeed(): number {
+    // Change protected to public
+    public getSpeed(): number {
         return super.getSpeed() * 0.2; // 20% of the player's speed
     }
 
