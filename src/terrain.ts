@@ -60,9 +60,9 @@ export class Terrain {
         }
     }
 
-    public generateTerrain(context: CanvasRenderingContext2D) {
-        for (let i = 0; i < this.blocks.length; i++) {
-            for (let j = 0; j < this.blocks[i].length; j++) {
+    public generateTerrain(context: CanvasRenderingContext2D, startX: number, startY: number, endX: number, endY: number) {
+        for (let i = startX; i < endX && i < this.blocks.length; i++) {
+            for (let j = startY; j < endY && j < this.blocks[i].length; j++) {
                 const block = this.blocks[i][j];
                 if (block.present) {
                     switch (block.type) {
@@ -101,5 +101,13 @@ export class Terrain {
             }
         }
         return null; // No block was removed
+    }
+
+    getWidth(): number {
+        return this.width;
+    }
+
+    getHeight(): number {
+        return this.height;
     }
 }

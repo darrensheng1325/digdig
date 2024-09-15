@@ -7,9 +7,15 @@ export class Enemy extends Player {
     private randomDirection: { x: number, y: number } = { x: 0, y: 0 };
     private randomMovementDuration: number = 0;
 
-    constructor(x: number, y: number, terrainWidth: number, terrainHeight: number, context: CanvasRenderingContext2D, target: Player) {
-        super(x, y, 50, 5, context);
+    constructor(x: number, y: number, terrainWidth: number, terrainHeight: number, context: CanvasRenderingContext2D, target: Player, terrain: Terrain) {
+        super(x, y, 50, 5, context, terrain);
         this.target = target;
+        this.setSize(20); // Set initial size
+    }
+
+    // Override the getSpeed method to make enemies much slower
+    protected getSpeed(): number {
+        return 0.5;
     }
 
     public update(terrain: Terrain, screenWidth: number, screenHeight: number, cameraX: number, cameraY: number) {
@@ -19,11 +25,12 @@ export class Enemy extends Player {
             this.moveTowardsTarget();
         }
 
-        // Attempt to dig
         const dugBlocks = this.dig(terrain);
         for (const block of dugBlocks) {
             this.handleDugBlock(block);
         }
+
+        this.updateRingRotation();
     }
 
     private isOffScreen(screenWidth: number, screenHeight: number, cameraX: number, cameraY: number): boolean {
@@ -33,7 +40,6 @@ export class Enemy extends Player {
 
     private moveRandomly() {
         if (this.randomMovementDuration <= 0) {
-            // Generate new random direction
             const angle = Math.random() * 2 * Math.PI;
             this.randomDirection = {
                 x: Math.cos(angle),
@@ -42,7 +48,7 @@ export class Enemy extends Player {
             this.randomMovementDuration = Math.random() * 100 + 50;
         }
 
-        const speed = this.getSpeed(); // This should now work
+        const speed = this.getSpeed();
         this.move(this.randomDirection.x * speed, this.randomDirection.y * speed);
         this.randomMovementDuration--;
     }
@@ -53,7 +59,7 @@ export class Enemy extends Player {
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         if (distance > 0) {
-            const speed = this.getSpeed(); // This should now work
+            const speed = this.getSpeed();
             const moveX = (dx / distance) * speed;
             const moveY = (dy / distance) * speed;
             this.move(moveX, moveY);
@@ -62,19 +68,27 @@ export class Enemy extends Player {
 
     private handleDugBlock(block: Block) {
         if (block.type === 'uranium') {
-            this.score -= 5; // Decrease score when uranium is dug
+            this.score -= 5;
         } else if (block.type === 'lava') {
-            this.adjustHealth(-20); // Decrease health when lava is dug
+            this.adjustHealth(-20);
         } else if (block.type === 'quartz') {
-            this.adjustShield(10); // Increase shield when quartz is dug
+            this.adjustShield(10);
         } else {
-            this.score += 1; // Increase score when other blocks are dug
+            this.score += 1;
         }
-        this.setSize(this.score); // Update enemy size based on score
+        this.updateSize();
     }
 
-    // We don't need to override setSize anymore, as it will use the Player's method
-    // which now allows unlimited growth
+    private updateSize() {
+        const minSize = 20;
+        const growthRate = 0.01;
+        const newSize = Math.max(minSize, minSize + this.score * growthRate);
+        this.setSize(newSize);
+    }
+
+    public setSize(newSize: number) {
+        super.setSize(newSize);
+    }
 
     public takeDamage(amount: number) {
         this.adjustHealth(-amount);
@@ -85,17 +99,6 @@ export class Enemy extends Player {
     }
 
     public draw() {
-        super.draw(); // Call the parent draw method
-
-        // Draw health bar
-        const healthBarWidth = this.getSize() * 2;
-        const healthBarHeight = 5;
-        const healthPercentage = this.getHealth() / 100;
-
-        this.getContext().fillStyle = 'red';
-        this.getContext().fillRect(this.getX() - healthBarWidth / 2, this.getY() - this.getSize() - 10, healthBarWidth, healthBarHeight);
-
-        this.getContext().fillStyle = 'green';
-        this.getContext().fillRect(this.getX() - healthBarWidth / 2, this.getY() - this.getSize() - 10, healthBarWidth * healthPercentage, healthBarHeight);
+        super.draw();
     }
 }

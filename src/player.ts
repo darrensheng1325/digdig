@@ -8,29 +8,37 @@ export class Player {
     private shield: number;
     private context: CanvasRenderingContext2D;
     private movementDirection: { x: number, y: number } = { x: 0, y: 0 };
-    private baseSpeed: number = 6; // Slightly increased base speed
+    private baseSpeed: number = 4; // Reduced from 6 to 4 for slightly slower movement
     private minSpeed: number = 0.5; // Reduced minimum speed
     private maxSpeed: number = 5; // Reduced maximum speed
     private optimalSize: number = 40; // Size at which the player is fastest
     private ringRotation: number = 0; // New property to track ring rotation
+    protected terrain: Terrain; // Add this line
 
-    constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D) {
+    constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D, terrain: Terrain) {
         this.x = x;
         this.y = y;
         this.size = 20; // Initial size
         this.health = health;
         this.shield = 0;
         this.context = context;
+        this.terrain = terrain; // Add this line
     }
 
     move(dx: number, dy: number) {
         const speed = this.getSpeed();
-        this.x += dx * speed;
-        this.y += dy * speed;
-        // Update movement direction
-        const length = Math.sqrt(dx * dx + dy * dy);
-        if (length > 0) {
-            this.movementDirection = { x: dx / length, y: dy / length };
+        const newX = this.x + dx * speed;
+        const newY = this.y + dy * speed;
+
+        // Check if the new position is within the terrain boundaries
+        if (newX >= 0 && newX < this.terrain.getWidth() && newY >= 0 && newY < this.terrain.getHeight()) {
+            this.x = newX;
+            this.y = newY;
+            // Update movement direction
+            const length = Math.sqrt(dx * dx + dy * dy);
+            if (length > 0) {
+                this.movementDirection = { x: dx / length, y: dy / length };
+            }
         }
     }
 
@@ -60,6 +68,7 @@ export class Player {
     }
 
     draw() {
+        this.updateRingRotation();
         // Update ring rotation
         this.ringRotation += Math.PI / 180; // Rotate 1 degree (in radians) per frame
         if (this.ringRotation >= Math.PI * 2) {
@@ -179,5 +188,12 @@ export class Player {
 
     public getContext(): CanvasRenderingContext2D {
         return this.context;
+    }
+
+    protected updateRingRotation(): void {
+        this.ringRotation += Math.PI / 180;
+        if (this.ringRotation >= Math.PI * 2) {
+            this.ringRotation -= Math.PI * 2;
+        }
     }
 }
