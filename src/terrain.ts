@@ -97,6 +97,7 @@ export class Terrain {
             const block = this.blocks[i][j];
             if (block.present) {
                 block.present = false;
+                console.log(`Removed block at (${i}, ${j}), type: ${block.type}`);
                 return block; // Return the removed block
             }
         }

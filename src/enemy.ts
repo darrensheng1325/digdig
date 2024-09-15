@@ -18,6 +18,8 @@ export class Enemy extends Player {
     }
 
     public update(terrain: Terrain, screenWidth: number, screenHeight: number, cameraX: number, cameraY: number) {
+        super.update(terrain, screenWidth, screenHeight, cameraX, cameraY);
+
         if (this.isOffScreen(screenWidth, screenHeight, cameraX, cameraY)) {
             this.moveRandomly();
         } else {

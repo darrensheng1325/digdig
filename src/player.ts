@@ -15,6 +15,7 @@ export class Player {
     protected ringRotation: number = 0; // Change from private to protected
     protected terrain: Terrain; // Add this line
     private score: number = 0; // Add this line
+    private _isDigging: boolean = false; // Changed from isDigging to _isDigging
 
     constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D, terrain: Terrain) {
         this.x = x;
@@ -40,6 +41,9 @@ export class Player {
             if (length > 0) {
                 this.movementDirection = { x: dx / length, y: dy / length };
             }
+            
+            // Dig at the new position
+            this.dig(this.terrain);
         }
     }
 
@@ -51,7 +55,7 @@ export class Player {
     }
 
     dig(terrain: Terrain) {
-        const digRadius = Math.floor(this.size / 2); // Dig radius is now half the size (full diameter)
+        const digRadius = Math.floor(this.size / 2);
         const dugBlocks = [];
 
         for (let dx = -digRadius; dx <= digRadius; dx++) {
@@ -65,6 +69,20 @@ export class Player {
             }
         }
 
+        // Handle dug blocks
+        for (const block of dugBlocks) {
+            if (block.type === 'uranium') {
+                this.adjustScore(-5);
+            } else if (block.type === 'lava') {
+                this.adjustHealth(-20);
+            } else if (block.type === 'quartz') {
+                this.adjustShield(10);
+            } else {
+                this.adjustScore(1);
+            }
+        }
+
+        this.setSize(this.getScore());
         return dugBlocks;
     }
 
@@ -227,5 +245,38 @@ export class Player {
 
     public adjustScore(amount: number) {
         this.score += amount;
+    }
+
+    public startDigging() {
+        this._isDigging = true;
+        console.log('Player started digging');
+    }
+
+    public stopDigging() {
+        this._isDigging = false;
+        console.log('Player stopped digging');
+    }
+
+    public isDigging(): boolean {
+        return this._isDigging;
+    }
+
+    public update(terrain: Terrain, screenWidth: number, screenHeight: number, cameraX: number, cameraY: number) {
+        if (this._isDigging) {
+            const dugBlocks = this.dig(terrain);
+            console.log(`Dug ${dugBlocks.length} blocks`);
+            for (const block of dugBlocks) {
+                if (block.type === 'uranium') {
+                    this.adjustScore(-5);
+                } else if (block.type === 'lava') {
+                    this.adjustHealth(-20);
+                } else if (block.type === 'quartz') {
+                    this.adjustShield(10);
+                } else {
+                    this.adjustScore(1);
+                }
+            }
+            this.setSize(this.getScore());
+        }
     }
 }

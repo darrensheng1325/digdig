@@ -6,11 +6,19 @@ class GameManager {
     private context: CanvasRenderingContext2D;
     private game: Game | null = null;
     private titleScreen: TitleScreen;
+    private controlToggleButton: HTMLButtonElement;
 
     constructor() {
         this.canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
         this.context = this.canvas.getContext('2d')!;
         this.titleScreen = new TitleScreen(this.canvas, this.context, () => this.startGame());
+        this.controlToggleButton = document.createElement('button');
+        this.controlToggleButton.textContent = 'Toggle Controls';
+        this.controlToggleButton.style.position = 'absolute';
+        this.controlToggleButton.style.top = '50px';
+        this.controlToggleButton.style.right = '10px';
+        this.controlToggleButton.style.zIndex = '1000';
+        document.body.appendChild(this.controlToggleButton);
     }
 
     public init() {
@@ -29,16 +37,27 @@ class GameManager {
 
     private showTitleScreen() {
         this.titleScreen.show();
+        this.controlToggleButton.style.display = 'none';
     }
 
     private startGame() {
         this.game = new Game('gameCanvas');
         this.setupFullscreenButton();
+        this.setupControlToggleButton();
+        this.controlToggleButton.style.display = 'block';
     }
 
     private setupFullscreenButton() {
         const fullscreenButton = document.getElementById('fullscreenButton')!;
         fullscreenButton.addEventListener('click', () => this.toggleFullscreen());
+    }
+
+    private setupControlToggleButton() {
+        this.controlToggleButton.addEventListener('click', () => {
+            if (this.game) {
+                this.game.toggleControls();
+            }
+        });
     }
 
     private toggleFullscreen() {

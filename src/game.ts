@@ -14,6 +14,7 @@ export class Game {
     private lastHealthRecoveryTime: number;
     private enemies: Enemy[] = [];
     private maxEnemies: number = 40; // Changed from 20 to 40
+    private isMouseControl: boolean = false;
 
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -34,6 +35,9 @@ export class Game {
     private init() {
         window.addEventListener('keydown', (e) => this.handleKeyDown(e));
         window.addEventListener('keyup', (e) => this.handleKeyUp(e));
+        this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+        this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+        this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
         this.resizeCanvas();
         this.gameLoop();
     }
@@ -51,6 +55,32 @@ export class Game {
         this.keysPressed.delete(event.key);
     }
 
+    private handleMouseMove(event: MouseEvent) {
+        if (this.isMouseControl) {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left + this.cameraX;
+            const y = event.clientY - rect.top + this.cameraY;
+            const dx = x - this.player.getX();
+            const dy = y - this.player.getY();
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance > 5) {  // Add a small threshold to prevent jittering
+                this.player.move(dx / distance * 5, dy / distance * 5);
+            }
+        }
+    }
+
+    private handleMouseDown(event: MouseEvent) {
+        if (this.isMouseControl) {
+            this.player.startDigging();
+        }
+    }
+
+    private handleMouseUp(event: MouseEvent) {
+        if (this.isMouseControl) {
+            this.player.stopDigging();
+        }
+    }
+
     private gameLoop() {
         this.update();
         this.render();
@@ -58,30 +88,26 @@ export class Game {
     }
 
     private update() {
-        // Update game state
-        let dx = 0;
-        let dy = 0;
+        if (!this.isMouseControl) {
+            // Existing keyboard control logic
+            let dx = 0;
+            let dy = 0;
 
-        if (this.keysPressed.has('ArrowUp')) dy -= 5;
-        if (this.keysPressed.has('ArrowDown')) dy += 5;
-        if (this.keysPressed.has('ArrowLeft')) dx -= 5;
-        if (this.keysPressed.has('ArrowRight')) dx += 5;
+            if (this.keysPressed.has('ArrowUp')) dy -= 1;
+            if (this.keysPressed.has('ArrowDown')) dy += 1;
+            if (this.keysPressed.has('ArrowLeft')) dx -= 1;
+            if (this.keysPressed.has('ArrowRight')) dx += 1;
 
-        this.player.move(dx, dy);
-
-        const dugBlocks = this.player.dig(this.terrain);
-        for (const block of dugBlocks) {
-            if (block.type === 'uranium') {
-                this.score -= 5; // Decrease score when uranium is dug
-            } else if (block.type === 'lava') {
-                this.player.adjustHealth(-20); // Decrease health when lava is dug
-            } else if (block.type === 'quartz') {
-                this.player.adjustShield(10); // Increase shield when quartz is dug
-            } else {
-                this.score += 1; // Increase score when other blocks are dug
+            if (dx !== 0 || dy !== 0) {
+                this.player.move(dx, dy);
             }
         }
-        this.player.setSize(this.score); // Update player size based on score
+
+        // Call player's update method with all required arguments
+        this.player.update(this.terrain, this.canvas.width, this.canvas.height, this.cameraX, this.cameraY);
+
+        // Log player's position and digging status for debugging
+        console.log(`Player position: (${this.player.getX()}, ${this.player.getY()}), Digging: ${this.player.isDigging()}`);
 
         // Health recovery over time
         const currentTime = Date.now();
@@ -184,6 +210,13 @@ export class Game {
             const y = Math.random() * this.terrain.getHeight();
             const enemy = new Enemy(x, y, this.terrain.getWidth(), this.terrain.getHeight(), this.context, this.player, this.terrain); // Pass terrain here
             this.enemies.push(enemy);
+        }
+    }
+
+    public toggleControls() {
+        this.isMouseControl = !this.isMouseControl;
+        if (this.isMouseControl) {
+            this.keysPressed.clear();  // Clear any pressed keys when switching to mouse control
         }
     }
 }
