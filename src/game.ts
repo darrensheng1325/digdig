@@ -15,8 +15,8 @@ export class Game {
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         this.context = this.canvas.getContext('2d')!;
-        this.player = new Player(400, 300, 2000, 2000); // Initial player position and terrain size
         this.terrain = new Terrain(2000, 2000); // Larger terrain size
+        this.player = new Player(400, 300, 100, 10, this.context); // Initial player position, health, attack, and context
         this.score = 0;
         this.keysPressed = new Set();
         this.cameraX = 0;
@@ -98,7 +98,7 @@ export class Game {
         this.context.save();
         this.context.translate(-this.cameraX, -this.cameraY);
         this.terrain.generateTerrain(this.context);
-        this.player.draw(this.context);
+        this.player.draw(); // Remove the context argument
         this.context.restore();
         this.drawScore();
         this.drawHealth();

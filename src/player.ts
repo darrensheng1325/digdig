@@ -1,142 +1,91 @@
-import { Terrain, Block } from './terrain';
+import { Terrain } from './terrain';
 
 export class Player {
     private x: number;
     private y: number;
     private size: number;
     private health: number;
-    private maxHealth: number;
     private shield: number;
-    private maxShield: number;
-    private terrainWidth: number;
-    private terrainHeight: number;
+    private context: CanvasRenderingContext2D;
 
-    constructor(x: number, y: number, terrainWidth: number, terrainHeight: number) {
+    constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D) {
         this.x = x;
         this.y = y;
-        this.size = 10; // Initial size
-        this.health = 100; // Initial health
-        this.maxHealth = 100; // Maximum health
-        this.shield = 0; // Initial shield
-        this.maxShield = 50; // Maximum shield
-        this.terrainWidth = terrainWidth;
-        this.terrainHeight = terrainHeight;
+        this.size = 20; // Initial size
+        this.health = health;
+        this.shield = 0;
+        this.context = context;
     }
 
-    public move(dx: number, dy: number) {
-        // Adjust speed based on size: smaller size -> faster speed, larger size -> slower speed
-        const speedFactor = 10 / this.size;
-        const newX = this.x + dx * speedFactor;
-        const newY = this.y + dy * speedFactor;
-
-        // Boundary checks
-        if (newX - this.size >= 0 && newX + this.size <= this.terrainWidth) {
-            this.x = newX;
-        }
-        if (newY - this.size >= 0 && newY + this.size <= this.terrainHeight) {
-            this.y = newY;
-        }
+    move(dx: number, dy: number) {
+        this.x += dx;
+        this.y += dy;
     }
 
-    public dig(terrain: Terrain): Block | null {
-        let blockRemoved: Block | null = null;
-        const radius = Math.ceil(this.size / 10); // Determine the radius of blocks to remove based on size
-
-        for (let dx = -radius; dx <= radius; dx++) {
-            for (let dy = -radius; dy <= radius; dy++) {
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance <= radius) {
-                    const block = terrain.removeBlock(this.x + dx * 10, this.y + dy * 10);
-                    if (block) {
-                        blockRemoved = block;
-                    }
-                }
-            }
-        }
-
-        return blockRemoved;
+    dig(terrain: Terrain) {
+        // Implement digging logic here
+        return terrain.removeBlock(this.x, this.y);
     }
 
-    public setSize(score: number) {
-        this.size = 10 + score * 0.1; // Increase size based on score
+    draw() {
+        // Draw player body (gray circle)
+        this.context.fillStyle = 'gray';
+        this.context.beginPath();
+        this.context.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+        this.context.fill();
+
+        // Draw face
+        const eyeWidth = this.size / 6;
+        const eyeHeight = this.size / 4;
+        const eyeY = this.y - eyeHeight / 2;
+
+        // Left eye
+        this.context.fillStyle = 'white';
+        this.context.fillRect(this.x - this.size / 6 - eyeWidth / 2, eyeY, eyeWidth, eyeHeight);
+
+        // Right eye
+        this.context.fillRect(this.x + this.size / 6 - eyeWidth / 2, eyeY, eyeWidth, eyeHeight);
+
+        // Draw pupils
+        this.context.fillStyle = 'black';
+        const pupilSize = Math.min(eyeWidth, eyeHeight) / 2;
+        this.context.fillRect(this.x - this.size / 6 - pupilSize / 2, eyeY + eyeHeight / 2 - pupilSize / 2, pupilSize, pupilSize);
+        this.context.fillRect(this.x + this.size / 6 - pupilSize / 2, eyeY + eyeHeight / 2 - pupilSize / 2, pupilSize, pupilSize);
+
+        // Draw smile
+        this.context.strokeStyle = 'black';
+        this.context.lineWidth = 2;
+        this.context.beginPath();
+        this.context.arc(this.x, this.y + this.size / 8, this.size / 5, 0.2 * Math.PI, 0.8 * Math.PI);
+        this.context.stroke();
     }
 
-    public adjustHealth(amount: number) {
-        if (amount < 0) {
-            // If damage is taken, deplete shield first
-            const shieldDamage = Math.min(this.shield, -amount);
-            this.shield -= shieldDamage;
-            amount += shieldDamage;
-        }
-        this.health += amount;
-        if (this.health > this.maxHealth) this.health = this.maxHealth; // Cap health at maxHealth
-        if (this.health < 0) this.health = 0; // Prevent health from going below 0
+    getX() { return this.x; }
+    getY() { return this.y; }
+    getHealth() { return this.health; }
+    getShield() { return this.shield; }
+
+    adjustHealth(amount: number) {
+        this.health = Math.max(0, Math.min(100, this.health + amount));
     }
 
-    public recoverHealth(amount: number) {
-        this.adjustHealth(amount);
+    adjustShield(amount: number) {
+        this.shield = Math.max(0, Math.min(100, this.shield + amount));
     }
 
-    public adjustShield(amount: number) {
-        this.shield += amount;
-        if (this.shield > this.maxShield) this.shield = this.maxShield; // Cap shield at maxShield
-        if (this.shield < 0) this.shield = 0; // Prevent shield from going below 0
+    recoverHealth(amount: number) {
+        this.health = Math.min(100, this.health + amount);
     }
 
-    public draw(context: CanvasRenderingContext2D) {
-        context.fillStyle = 'blue';
-        context.beginPath();
-        context.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        context.fill();
-        this.drawHealthBar(context);
-        this.drawShieldBar(context);
+    setSize(score: number) {
+        this.size = Math.max(20, Math.min(40, 20 + score * 0.1));
     }
 
-    private drawHealthBar(context: CanvasRenderingContext2D) {
-        const barWidth = 50;
-        const barHeight = 5;
-        const barX = this.x - barWidth / 2;
-        const barY = this.y + this.size + 5; // Position the health bar below the player
-
-        // Draw the background of the health bar
-        context.fillStyle = 'red';
-        context.fillRect(barX, barY, barWidth, barHeight);
-
-        // Draw the current health
-        const healthWidth = (this.health / this.maxHealth) * barWidth;
-        context.fillStyle = 'green';
-        context.fillRect(barX, barY, healthWidth, barHeight);
+    public getSize(): number {
+        return this.size;
     }
 
-    private drawShieldBar(context: CanvasRenderingContext2D) {
-        const barWidth = 50;
-        const barHeight = 5;
-        const barX = this.x - barWidth / 2;
-        const barY = this.y + this.size + 15; // Position the shield bar below the health bar
-
-        // Draw the background of the shield bar
-        context.fillStyle = 'gray';
-        context.fillRect(barX, barY, barWidth, barHeight);
-
-        // Draw the current shield
-        const shieldWidth = (this.shield / this.maxShield) * barWidth;
-        context.fillStyle = 'blue';
-        context.fillRect(barX, barY, shieldWidth, barHeight);
-    }
-
-    public getX(): number {
-        return this.x;
-    }
-
-    public getY(): number {
-        return this.y;
-    }
-
-    public getHealth(): number {
-        return this.health;
-    }
-
-    public getShield(): number {
-        return this.shield;
+    public getContext(): CanvasRenderingContext2D {
+        return this.context;
     }
 }
