@@ -1,8 +1,9 @@
-export type BlockType = 'dirt' | 'diamond' | 'uranium' | 'lava' | 'quartz';
+export type BlockType = 'dirt' | 'diamond' | 'uranium' | 'lava' | 'quartz' | 'bedrock';
 
 export interface Block {
     type: BlockType;
     present: boolean;
+    durability?: number; // Add durability for bedrock
 }
 
 export class Terrain {
@@ -27,11 +28,13 @@ export class Terrain {
             blocks.push(row);
         }
 
-        // Generate clusters of diamond, uranium, lava, and quartz with random sizes
-        this.generateClusters(blocks, 'diamond', 0.0001, 3, 7); // 0.01% chance, cluster size 3-7
-        this.generateClusters(blocks, 'uranium', 0.00005, 2, 5); // 0.005% chance, cluster size 2-5
-        this.generateClusters(blocks, 'lava', 0.0002, 3, 6); // 0.02% chance, cluster size 3-6
-        this.generateClusters(blocks, 'quartz', 0.0001, 3, 7); // 0.01% chance, cluster size 3-7
+        // Generate clusters of ore types
+        this.generateClusters(blocks, 'diamond', 0.0001, 3, 7);
+        this.generateClusters(blocks, 'uranium', 0.00005, 2, 5);
+        this.generateClusters(blocks, 'lava', 0.0002, 3, 6);
+        this.generateClusters(blocks, 'quartz', 0.0001, 3, 7);
+        this.generateClusters(blocks, 'bedrock', 0.00005, 2, 5); // Changed to match uranium
+        this.generateGeodes(blocks, 0.000005, 5, 8); // Very rare geodes
 
         return blocks;
     }
@@ -47,10 +50,6 @@ export class Terrain {
         }
     }
 
-    private getRandomClusterSize(min: number, max: number): number {
-        return Math.floor(Math.random() * (max - min + 1)) + min;
-    }
-
     private createCluster(blocks: Block[][], x: number, y: number, type: BlockType, size: number) {
         for (let dx = -size; dx <= size; dx++) {
             for (let dy = -size; dy <= size; dy++) {
@@ -61,7 +60,45 @@ export class Terrain {
                     if (i >= 0 && i < blocks.length && j >= 0 && j < blocks[i].length) {
                         // Use noise to determine if this block should be part of the cluster
                         if (this.noise(i, j, size) > 0.5) {
-                            blocks[i][j] = { type, present: true };
+                            if (type === 'bedrock') {
+                                blocks[i][j] = { type, present: true, durability: 50 }; // Increased durability for bedrock
+                            } else {
+                                blocks[i][j] = { type, present: true };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private generateGeodes(blocks: Block[][], chance: number, minSize: number, maxSize: number) {
+        for (let i = 0; i < blocks.length; i++) {
+            for (let j = 0; j < blocks[i].length; j++) {
+                if (Math.random() < chance) {
+                    const geodeSize = this.getRandomClusterSize(minSize, maxSize);
+                    this.createGeode(blocks, i, j, geodeSize);
+                }
+            }
+        }
+    }
+
+    private createGeode(blocks: Block[][], x: number, y: number, size: number) {
+        for (let dx = -size; dx <= size; dx++) {
+            for (let dy = -size; dy <= size; dy++) {
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance <= size) {
+                    const i = x + dx;
+                    const j = y + dy;
+                    if (i >= 0 && i < blocks.length && j >= 0 && j < blocks[i].length) {
+                        if (this.noise(i, j, size) > 0.5) {
+                            if (distance <= size / 2) {
+                                // Diamond core
+                                blocks[i][j] = { type: 'diamond', present: true };
+                            } else {
+                                // Bedrock shell with higher durability
+                                blocks[i][j] = { type: 'bedrock', present: true, durability: 100 };
+                            }
                         }
                     }
                 }
@@ -73,6 +110,10 @@ export class Terrain {
         // Simple noise function, you can replace this with a more sophisticated one if needed
         const value = Math.sin(x * 0.1) + Math.sin(y * 0.1) + Math.sin((x + y) * 0.1);
         return (Math.sin(value * size) + 1) / 2; // Normalize to 0-1 range
+    }
+
+    private getRandomClusterSize(min: number, max: number): number {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
     public generateTerrain(context: CanvasRenderingContext2D, startX: number, startY: number, endX: number, endY: number) {
@@ -104,6 +145,12 @@ export class Terrain {
         const blockY = Math.floor(y / 10);
         if (this.blocks[blockX] && this.blocks[blockX][blockY] && this.blocks[blockX][blockY].present) {
             const block = this.blocks[blockX][blockY];
+            if (block.type === 'bedrock') {
+                if (block.durability && block.durability > 1) {
+                    this.blocks[blockX][blockY] = { ...block, durability: block.durability - 1 };
+                    return null; // Return null to indicate the block wasn't fully removed
+                }
+            }
             this.blocks[blockX][blockY] = { ...block, present: false };
             return block;
         }
@@ -127,6 +174,8 @@ export class Terrain {
                 return '#FF4500'; // Orange Red
             case 'quartz':
                 return '#F0F8FF'; // Alice Blue
+            case 'bedrock':
+                return '#4A4A4A'; // Dark gray for bedrock
             default:
                 return '#A9A9A9'; // Dark Gray
         }

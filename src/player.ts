@@ -1,4 +1,4 @@
-import { Terrain } from './terrain';
+import { Terrain, Block } from './terrain';
 
 export class Player {
     protected x: number;
@@ -59,11 +59,11 @@ export class Player {
 
     dig(terrain: Terrain) {
         const digRadius = Math.floor(this.size / 2);
-        const dugBlocks = [];
+        const dugBlocks: Block[] = [];
 
         for (let dx = -digRadius; dx <= digRadius; dx++) {
             for (let dy = -digRadius; dy <= digRadius; dy++) {
-                if (dx * dx + dy * dy <= digRadius * digRadius) { // Check if within circular dig area
+                if (dx * dx + dy * dy <= digRadius * digRadius) {
                     const block = terrain.removeBlock(this.x + dx, this.y + dy);
                     if (block) {
                         dugBlocks.push(block);
@@ -74,14 +74,22 @@ export class Player {
 
         // Handle dug blocks
         for (const block of dugBlocks) {
-            if (block.type === 'uranium') {
-                this.adjustHealth(-5);
-            } else if (block.type === 'lava') {
-                this.adjustHealth(-20);
-            } else if (block.type === 'quartz') {
-                this.adjustShield(10);
-            } else {
-                this.adjustScore(1); // Increase score for regular blocks
+            switch (block.type) {
+                case 'uranium':
+                    this.adjustHealth(-5);
+                    break;
+                case 'lava':
+                    this.adjustHealth(-20);
+                    break;
+                case 'quartz':
+                    this.adjustShield(10);
+                    break;
+                case 'bedrock':
+                    // Bedrock gives more score when finally dug
+                    this.adjustScore(5);
+                    break;
+                default:
+                    this.adjustScore(1);
             }
         }
 
@@ -277,11 +285,5 @@ export class Player {
         if (this._isDigging) {
             this.dig(terrain);
         }
-    }
-
-    // Add a new method to handle enemy kills
-    public onEnemyKill() {
-        this.adjustScore(1); // Increase score by 1 for each enemy killed
-        this.setSize(this.getScore());
     }
 }
