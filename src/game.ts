@@ -64,8 +64,8 @@ export class Game {
 
         this.player.move(dx, dy);
 
-        const block = this.player.dig(this.terrain);
-        if (block) {
+        const dugBlocks = this.player.dig(this.terrain);
+        for (const block of dugBlocks) {
             if (block.type === 'uranium') {
                 this.score -= 5; // Decrease score when uranium is dug
             } else if (block.type === 'lava') {
@@ -75,8 +75,8 @@ export class Game {
             } else {
                 this.score += 1; // Increase score when other blocks are dug
             }
-            this.player.setSize(this.score); // Update player size based on score
         }
+        this.player.setSize(this.score); // Update player size based on score
 
         // Health recovery over time
         const currentTime = Date.now();
