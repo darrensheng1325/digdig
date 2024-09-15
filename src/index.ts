@@ -1,22 +1,35 @@
-import { Game } from './game';
+import { ClientGame } from './clientGame';
+import { GameState } from './types';
 
-window.onload = () => {
-    const game = new Game('gameCanvas');
+const socket = new WebSocket('ws://localhost:3000');
+let clientGame: ClientGame;
 
-    const fullscreenButton = document.getElementById('fullscreenButton')!;
-    fullscreenButton.addEventListener('click', () => {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen();
-        } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            }
+socket.addEventListener('open', () => {
+    console.log('Connected to server');
+});
+
+socket.addEventListener('message', (event) => {
+    const data = JSON.parse(event.data);
+    console.log('Received data:', data);  // Add this line
+    if (data.type === 'initialState') {
+        clientGame = new ClientGame('gameCanvas', data.gameState, socket);
+        clientGame.start();
+    } else if (data.type === 'gameState') {
+        if (clientGame) {
+            clientGame.updateState(data.gameState);
         }
-    });
+    }
+});
 
-    window.addEventListener('resize', () => {
-        game.resizeCanvas();
-    });
+// Handle player input
+document.addEventListener('keydown', (event) => {
+    if (clientGame) {
+        clientGame.handleKeyDown(event);
+    }
+});
 
-    game.resizeCanvas(); // Set initial canvas size
-};
+document.addEventListener('keyup', (event) => {
+    if (clientGame) {
+        clientGame.handleKeyUp(event);
+    }
+});

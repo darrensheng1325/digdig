@@ -1,4 +1,10 @@
 const path = require('path');
+const customConfig = {
+    stats: {
+       errorDetails: true,
+       children: true
+    },
+ }
 
 module.exports = {
     entry: './src/index.ts',
