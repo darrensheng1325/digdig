@@ -1,4 +1,4 @@
-export type BlockType = 'dirt' | 'diamond' | 'uranium' | 'lava' | 'quartz' | 'bedrock' | 'gold_ore'; // Add 'gold_ore'
+export type BlockType = 'dirt' | 'diamond' | 'uranium' | 'lava' | 'quartz' | 'bedrock' | 'gold_ore' | 'portal'; // Add 'portal'
 
 export interface Block {
     type: BlockType;
@@ -11,11 +11,14 @@ export class Terrain {
     private height: number;
     private blocks: Block[][];
     private dugColor: string = '#3D2817'; // Dark brown color for dug areas
+    private portalLocation: { x: number, y: number };
 
     constructor(width: number, height: number) {
         this.width = width;
         this.height = height;
         this.blocks = this.createBlocks();
+        this.portalLocation = { x: Math.floor(width / 20), y: Math.floor(height / 20) };
+        this.createPortal();
     }
 
     private createBlocks(): Block[][] {
@@ -146,6 +149,9 @@ export class Terrain {
         const blockY = Math.floor(y / 10);
         if (this.blocks[blockX] && this.blocks[blockX][blockY] && this.blocks[blockX][blockY].present) {
             const block = this.blocks[blockX][blockY];
+            if (block.type === 'portal') {
+                return null; // Portal blocks cannot be removed
+            }
             if (block.type === 'bedrock') {
                 if (block.durability && block.durability > 1) {
                     this.blocks[blockX][blockY] = { ...block, durability: block.durability - 1 };
@@ -179,6 +185,8 @@ export class Terrain {
                 return '#4A4A4A'; // Dark gray for bedrock
             case 'gold_ore':
                 return '#FFD700'; // Gold color
+            case 'portal':
+                return '#8A2BE2'; // BlueViolet color for the portal
             default:
                 return '#A9A9A9'; // Dark Gray
         }
@@ -193,11 +201,30 @@ export class Terrain {
         return null;
     }
 
+    public getPortalLocation(): { x: number, y: number } {
+        return { x: this.portalLocation.x * 10, y: this.portalLocation.y * 10 };
+    }
+
     getWidth(): number {
         return this.width;
     }
 
     getHeight(): number {
         return this.height;
+    }
+
+    private createPortal() {
+        const portalSize = 5;
+        for (let i = -portalSize; i <= portalSize; i++) {
+            for (let j = -portalSize; j <= portalSize; j++) {
+                if (i*i + j*j <= portalSize*portalSize) {
+                    const x = this.portalLocation.x + i;
+                    const y = this.portalLocation.y + j;
+                    if (x >= 0 && x < this.width / 10 && y >= 0 && y < this.height / 10) {
+                        this.blocks[x][y] = { type: 'portal', present: true };
+                    }
+                }
+            }
+        }
     }
 }

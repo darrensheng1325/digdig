@@ -2,6 +2,7 @@ import { Player, Emote } from './player';
 import { Enemy } from './enemy';
 import { Terrain, Block } from './terrain';
 import { Shop } from './shop';
+import { AlternateDimension } from './alternateDimension';
 
 export class Game {
     private canvas: HTMLCanvasElement;
@@ -25,12 +26,33 @@ export class Game {
     private emoteWheelRadius: number = 100;
     private selectedEmote: Emote | null = null;
     private shop: Shop;
+    private alternateDimension: AlternateDimension | null = null;
+    private isInAlternateDimension: boolean = false;
+    private portalCooldown: number = 0;
+    private readonly PORTAL_COOLDOWN_DURATION: number = 5000; // 5 seconds cooldown
 
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         this.context = this.canvas.getContext('2d')!;
         this.terrain = new Terrain(10000, 10000); // Increased terrain size to 10000x10000
-        this.player = new Player(5000, 5000, 100, 10, this.context, this.terrain); // Start player in the middle
+        
+        // Get the portal location
+        const portalLocation = this.terrain.getPortalLocation();
+        
+        // Add a small random offset (between -50 and 50 pixels) to avoid spawning directly on the portal
+        const offsetX = Math.random() * 100 - 50;
+        const offsetY = Math.random() * 100 - 50;
+        
+        // Create the player at the portal location with the offset
+        this.player = new Player(
+            portalLocation.x + offsetX,
+            portalLocation.y + offsetY,
+            100,
+            10,
+            this.context,
+            this.terrain
+        );
+
         this.score = 0;
         this.keysPressed = new Set();
         this.cameraX = 0;
@@ -39,6 +61,7 @@ export class Game {
         this.enemies = [];
         this.spawnEnemies(20); // Increased initial spawn from 15 to 20
         this.shop = new Shop(this.player, this.context);
+        this.alternateDimension = new AlternateDimension(10000, 10000, this.context);
 
         this.init();
     }
@@ -230,6 +253,44 @@ export class Game {
 
         // Update enemies' emotes
         this.enemies.forEach(enemy => enemy.updateEmote(deltaTime));
+
+        // Update portal cooldown
+        if (this.portalCooldown > 0) {
+            this.portalCooldown -= deltaTime;
+            if (this.portalCooldown < 0) {
+                this.portalCooldown = 0;
+            }
+        }
+
+        // Check if player is on the portal
+        let portalLocation;
+        if (this.isInAlternateDimension) {
+            portalLocation = this.alternateDimension!.getPortalLocation();
+        } else {
+            portalLocation = this.terrain.getPortalLocation();
+        }
+        const playerX = this.player.getX();
+        const playerY = this.player.getY();
+        const portalRadius = 25; // Half the size of the portal
+
+        if (Math.abs(playerX - portalLocation.x) < portalRadius && 
+            Math.abs(playerY - portalLocation.y) < portalRadius &&
+            this.portalCooldown === 0) {
+            this.toggleDimension();
+            this.portalCooldown = this.PORTAL_COOLDOWN_DURATION;
+        }
+
+        // Update the current dimension
+        if (this.isInAlternateDimension) {
+            this.alternateDimension!.update(this.player, this.enemies);
+            if (this.player.isDigging()) {
+                // The digging in alternate dimension is handled in AlternateDimension.update
+            }
+        } else {
+            if (this.player.isDigging()) {
+                this.player.dig(this.terrain);
+            }
+        }
     }
 
     private updateZoom() {
@@ -293,8 +354,12 @@ export class Game {
         const startY = Math.floor((this.player.getY() - visibleHeight / 2) / 10);
         const endX = Math.ceil((this.player.getX() + visibleWidth / 2) / 10);
         const endY = Math.ceil((this.player.getY() + visibleHeight / 2) / 10);
-        
-        this.terrain.generateTerrain(this.context, startX, startY, endX, endY);
+
+        if (this.isInAlternateDimension) {
+            this.alternateDimension!.render(this.context, this.player, this.canvas.width, this.canvas.height, this.zoom);
+        } else {
+            this.terrain.generateTerrain(this.context, startX, startY, endX, endY);
+        }
         
         // Draw enemies
         this.enemies.forEach(enemy => {
@@ -315,6 +380,11 @@ export class Game {
             this.shop.render(this.canvas.width, this.canvas.height);
         } else if (this.isEmoteWheelOpen) {
             this.renderEmoteWheel();
+        }
+
+        // Render portal cooldown indicator
+        if (this.portalCooldown > 0) {
+            this.renderPortalCooldown();
         }
     }
 
@@ -432,5 +502,47 @@ export class Game {
             case Emote.Dead: return '💀';
             default: return '';
         }
+    }
+
+    private toggleDimension() {
+        if (this.portalCooldown === 0) {
+            this.isInAlternateDimension = !this.isInAlternateDimension;
+            this.player.setInAlternateDimension(this.isInAlternateDimension);
+            if (this.isInAlternateDimension) {
+                console.log("Entered alternate dimension");
+                const alternateDimensionPortal = this.alternateDimension!.getPortalLocation();
+                this.player.setPosition(alternateDimensionPortal.x, alternateDimensionPortal.y);
+            } else {
+                console.log("Returned to normal dimension");
+                const normalDimensionPortal = this.terrain.getPortalLocation();
+                this.player.setPosition(normalDimensionPortal.x, normalDimensionPortal.y);
+            }
+            this.portalCooldown = this.PORTAL_COOLDOWN_DURATION;
+        } else {
+            console.log("Portal on cooldown. Time remaining:", this.portalCooldown / 1000, "seconds");
+        }
+    }
+
+    private renderPortalCooldown() {
+        const cooldownPercentage = this.portalCooldown / this.PORTAL_COOLDOWN_DURATION;
+        const barWidth = 200;
+        const barHeight = 20;
+        const x = (this.canvas.width - barWidth) / 2;
+        const y = 50;
+
+        // Draw background
+        this.context.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        this.context.fillRect(x, y, barWidth, barHeight);
+
+        // Draw cooldown progress
+        this.context.fillStyle = 'rgba(0, 100, 255, 0.7)';
+        this.context.fillRect(x, y, barWidth * (1 - cooldownPercentage), barHeight);
+
+        // Draw text
+        this.context.fillStyle = 'white';
+        this.context.font = '14px Arial';
+        this.context.textAlign = 'center';
+        this.context.textBaseline = 'middle';
+        this.context.fillText('Portal Cooldown', x + barWidth / 2, y + barHeight / 2);
     }
 }

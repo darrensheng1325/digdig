@@ -32,6 +32,8 @@ export class Player {
     private emoteDisplayTime: number = 0;
     private readonly EMOTE_DURATION: number = 2000;
     private ownedEmotes: Set<Emote> = new Set([Emote.Happy, Emote.Sad, Emote.Angry, Emote.Surprised]);
+    private isInAlternateDimension: boolean = false;
+    private alternateDimensionScore: number = 0;
 
     constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D, terrain: Terrain) {
         this.x = x;
@@ -73,6 +75,10 @@ export class Player {
     }
 
     dig(terrain: Terrain) {
+        if (this.isInAlternateDimension) {
+            return []; // Return an empty array if in alternate dimension
+        }
+
         const digRadius = Math.floor(this.size / 2);
         const dugBlocks: Block[] = [];
 
@@ -228,8 +234,9 @@ export class Player {
         this.context.font = `${this.size / 3}px Arial`;
         this.context.textAlign = 'center';
         
+        // Display the combined score (regular + alternate dimension)
         this.context.fillStyle = 'white';
-        this.context.fillText(`${this.getScore()}`, this.x - this.size / 2, this.y - this.size / 2 - 20);
+        this.context.fillText(`${this.getScore()}`, this.x, this.y - this.size / 2 - 20);
         
         this.context.fillStyle = 'gold';
         this.context.fillText(`${this.goldScore}`, this.x + this.size / 2, this.y - this.size / 2 - 20);
@@ -513,6 +520,27 @@ export class Player {
             // If no saved emotes, initialize with default emotes
             this.ownedEmotes = new Set([Emote.Happy, Emote.Sad, Emote.Angry, Emote.Surprised]);
         }
+    }
+
+    public setPosition(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+    }
+
+    public setInAlternateDimension(value: boolean) {
+        this.isInAlternateDimension = value;
+    }
+
+    public adjustAlternateDimensionScore(amount: number) {
+        this.alternateDimensionScore += amount;
+        this.score += amount; // Add the amount to the regular score as well
+        this.setSize(this.getScore() + this.getGoldScore());
+        console.log(`Alternate Dimension Score adjusted. New score: ${this.alternateDimensionScore}`);
+        console.log(`Regular Score adjusted. New score: ${this.score}`);
+    }
+
+    public getAlternateDimensionScore(): number {
+        return this.alternateDimensionScore;
     }
 }
 
