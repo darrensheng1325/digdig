@@ -17,6 +17,7 @@ export class Player {
     private score: number = 0; // Add this line
     private _isDigging: boolean = false; // Changed from isDigging to _isDigging
     private maxSize: number = 1000; // Changed from 100 to 1000
+    private goldScore: number = 0;
 
     constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D, terrain: Terrain) {
         this.x = x;
@@ -26,6 +27,7 @@ export class Player {
         this.shield = 0;
         this.context = context;
         this.terrain = terrain; // Add this line
+        this.loadGoldScore(); // Load the gold score from local storage
     }
 
     move(dx: number, dy: number) {
@@ -74,27 +76,33 @@ export class Player {
 
         // Handle dug blocks
         for (const block of dugBlocks) {
-            switch (block.type) {
-                case 'uranium':
-                    this.adjustHealth(-5);
-                    break;
-                case 'lava':
-                    this.adjustHealth(-20);
-                    break;
-                case 'quartz':
-                    this.adjustShield(10);
-                    break;
-                case 'bedrock':
-                    // Bedrock gives more score when finally dug
-                    this.adjustScore(5);
-                    break;
-                default:
-                    this.adjustScore(1);
-            }
+            this.handleDugBlock(block);
         }
 
-        this.setSize(this.getScore());
         return dugBlocks;
+    }
+
+    protected handleDugBlock(block: Block) {
+        switch (block.type) {
+            case 'uranium':
+                this.adjustHealth(-5);
+                break;
+            case 'lava':
+                this.adjustHealth(-20);
+                break;
+            case 'quartz':
+                this.adjustShield(10);
+                break;
+            case 'bedrock':
+                this.adjustScore(5);
+                break;
+            case 'gold_ore':
+                this.adjustGoldScore(1);
+                break;
+            default:
+                this.adjustScore(1);
+        }
+        this.setSize(this.getScore() + this.getGoldScore());
     }
 
     draw() {
@@ -210,6 +218,16 @@ export class Player {
             barWidth * shieldPercentage, 
             barHeight
         );
+
+        // Draw regular score and gold score
+        this.context.font = `${this.size / 3}px Arial`;
+        this.context.textAlign = 'center';
+        
+        this.context.fillStyle = 'white';
+        this.context.fillText(`${this.getScore()}`, this.x - this.size / 2, this.y - this.size / 2 - 20);
+        
+        this.context.fillStyle = 'gold';
+        this.context.fillText(`${this.goldScore}`, this.x + this.size / 2, this.y - this.size / 2 - 20);
     }
 
     getX() { return this.x; }
@@ -284,6 +302,27 @@ export class Player {
     public update(terrain: Terrain, screenWidth: number, screenHeight: number, cameraX: number, cameraY: number) {
         if (this._isDigging) {
             this.dig(terrain);
+        }
+    }
+
+    public getGoldScore(): number {
+        return this.goldScore;
+    }
+
+    public adjustGoldScore(amount: number) {
+        this.goldScore += amount;
+        this.saveGoldScore(); // Save the gold score after each adjustment
+        console.log(`Gold score adjusted. New gold score: ${this.goldScore}`);
+    }
+
+    private saveGoldScore(): void {
+        localStorage.setItem('playerGoldScore', this.goldScore.toString());
+    }
+
+    private loadGoldScore(): void {
+        const savedGoldScore = localStorage.getItem('playerGoldScore');
+        if (savedGoldScore !== null) {
+            this.goldScore = parseInt(savedGoldScore, 10);
         }
     }
 }

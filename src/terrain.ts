@@ -1,4 +1,4 @@
-export type BlockType = 'dirt' | 'diamond' | 'uranium' | 'lava' | 'quartz' | 'bedrock';
+export type BlockType = 'dirt' | 'diamond' | 'uranium' | 'lava' | 'quartz' | 'bedrock' | 'gold_ore'; // Add 'gold_ore'
 
 export interface Block {
     type: BlockType;
@@ -33,8 +33,9 @@ export class Terrain {
         this.generateClusters(blocks, 'uranium', 0.00005, 2, 5);
         this.generateClusters(blocks, 'lava', 0.0002, 3, 6);
         this.generateClusters(blocks, 'quartz', 0.0001, 3, 7);
-        this.generateClusters(blocks, 'bedrock', 0.00005, 2, 5); // Changed to match uranium
-        this.generateGeodes(blocks, 0.000005, 5, 8); // Very rare geodes
+        this.generateClusters(blocks, 'bedrock', 0.00005, 2, 5);
+        this.generateClusters(blocks, 'gold_ore', 0.00015, 3, 6); // Add gold ore generation
+        this.generateGeodes(blocks, 0.000005, 5, 8);
 
         return blocks;
     }
@@ -176,6 +177,8 @@ export class Terrain {
                 return '#F0F8FF'; // Alice Blue
             case 'bedrock':
                 return '#4A4A4A'; // Dark gray for bedrock
+            case 'gold_ore':
+                return '#FFD700'; // Gold color
             default:
                 return '#A9A9A9'; // Dark Gray
         }

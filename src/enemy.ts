@@ -67,13 +67,15 @@ export class Enemy extends Player {
         }
     }
 
-    private handleDugBlock(block: Block) {
+    protected handleDugBlock(block: Block) {
         if (block.type === 'uranium') {
             this.adjustScore(-5);
         } else if (block.type === 'lava') {
             this.adjustHealth(-20);
         } else if (block.type === 'quartz') {
             this.adjustShield(10);
+        } else if (block.type === 'gold_ore') {
+            this.adjustGoldScore(1);
         } else {
             this.adjustScore(1);
         }
@@ -82,7 +84,7 @@ export class Enemy extends Player {
 
     private updateSize() {
         const growthRate = 0.03; // Increased growth rate (twice as fast as the player)
-        const newSize = this.getSize() + this.getScore() * growthRate;
+        const newSize = this.getSize() + (this.getScore() + this.getGoldScore()) * growthRate;
         this.setSize(newSize);
     }
 
@@ -200,5 +202,11 @@ export class Enemy extends Player {
             barWidth * shieldPercentage, 
             barHeight
         );
+
+        // Draw gold score
+        context.fillStyle = 'gold';
+        context.font = `${size / 3}px Arial`;
+        context.textAlign = 'center';
+        context.fillText(`${this.getGoldScore()}`, x, y - size / 2 - 20);
     }
 }
