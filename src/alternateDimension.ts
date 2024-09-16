@@ -298,4 +298,20 @@ export class AlternateDimension {
     public getPortalLocation(): { x: number, y: number } {
         return this.portalLocation;
     }
+
+    public getWalls(): Wall[] {
+        return this.walls;
+    }
+
+    public getWidth(): number {
+        return this.width;
+    }
+
+    public getHeight(): number {
+        return this.height;
+    }
+
+    public generateNewPortalLocation(): void {
+        this.portalLocation = this.findSafePortalLocation();
+    }
 }

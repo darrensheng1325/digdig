@@ -117,7 +117,7 @@ export class Player {
                 this.adjustHealth(-5);
                 break;
             case 'lava':
-                this.adjustHealth(-20);
+                this.adjustHealth(-20); // This will now stop draining at 5 health
                 break;
             case 'quartz':
                 this.adjustShield(10);
@@ -272,8 +272,13 @@ export class Player {
 
     adjustHealth(amount: number) {
         if (amount < 0) {
-            this.takeDamage(-amount);
+            // For damage (negative amount)
+            if (this.health > 5) {
+                // Only apply damage if health is above 5
+                this.health = Math.max(5, this.health + amount);
+            }
         } else {
+            // For healing (positive amount)
             this.health = Math.min(100, this.health + amount);
         }
     }

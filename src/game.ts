@@ -43,14 +43,20 @@ export class Game {
         // Get the portal location
         const portalLocation = this.terrain.getPortalLocation();
         
-        // Add a small random offset (between -50 and 50 pixels) to avoid spawning directly on the portal
-        const offsetX = Math.random() * 100 - 50;
-        const offsetY = Math.random() * 100 - 50;
+        // Set a minimum spawn distance from the portal
+        const minSpawnDistance = 1000; // Adjust this value as needed
         
-        // Create the player at the portal location with the offset
+        // Generate a random spawn point that's at least minSpawnDistance away from the portal
+        let spawnX, spawnY;
+        do {
+            spawnX = Math.random() * this.terrain.getWidth();
+            spawnY = Math.random() * this.terrain.getHeight();
+        } while (this.distanceBetween(spawnX, spawnY, portalLocation.x, portalLocation.y) < minSpawnDistance);
+        
+        // Create the player at the spawn location
         this.player = new Player(
-            portalLocation.x + offsetX,
-            portalLocation.y + offsetY,
+            spawnX,
+            spawnY,
             100,
             10,
             this.context,
@@ -380,6 +386,11 @@ export class Game {
         if (this.isGameOver) {
             this.renderGameOverMessage();
         }
+
+        // Render minimap
+        if (this.isInAlternateDimension) {
+            this.renderMinimap(this.context, 200, 200);
+        }
     }
 
     private isEnemyVisible(enemy: Enemy, visibleWidth: number, visibleHeight: number): boolean {
@@ -496,6 +507,7 @@ export class Game {
             this.player.setInAlternateDimension(this.isInAlternateDimension);
             if (this.isInAlternateDimension) {
                 console.log("Entered alternate dimension");
+                this.alternateDimension!.generateNewPortalLocation();
                 const alternateDimensionPortal = this.alternateDimension!.getPortalLocation();
                 // Add a small random offset to avoid spawning directly on the portal
                 const offsetX = (Math.random() - 0.5) * 50;
@@ -513,6 +525,9 @@ export class Game {
             
             // Force an update of the camera position
             this.updateCameraPosition();
+            
+            // Update minimap visibility
+            this.updateMinimapVisibility();
         } else {
             console.log("Portal on cooldown. Time remaining:", this.portalCooldown / 1000, "seconds");
         }
@@ -577,5 +592,52 @@ export class Game {
         ctx.font = '24px Arial';
         ctx.fillText('Reloading...', this.canvas.width / 2, this.canvas.height / 2 + 50);
         ctx.restore();
+    }
+
+    public renderMinimap(context: CanvasRenderingContext2D, width: number, height: number) {
+        if (!this.alternateDimension) return;
+
+        const scale = Math.min(width / this.alternateDimension.getWidth(), height / this.alternateDimension.getHeight());
+
+        context.fillStyle = '#000033'; // Dark blue background
+        context.fillRect(0, 0, width, height);
+
+        // Draw walls
+        context.fillStyle = 'white';
+        this.alternateDimension.getWalls().forEach(wall => {
+            context.fillRect(
+                wall.x * scale,
+                wall.y * scale,
+                wall.width * scale,
+                wall.height * scale
+            );
+        });
+
+        // Draw portal
+        const portal = this.alternateDimension.getPortalLocation();
+        context.fillStyle = '#00FF00'; // Green
+        context.beginPath();
+        context.arc(portal.x * scale, portal.y * scale, 5, 0, Math.PI * 2);
+        context.fill();
+
+        // Draw player position if in alternate dimension
+        if (this.isInAlternateDimension) {
+            context.fillStyle = 'red';
+            context.beginPath();
+            context.arc(this.player.getX() * scale, this.player.getY() * scale, 3, 0, Math.PI * 2);
+            context.fill();
+        }
+    }
+
+    private updateMinimapVisibility() {
+        const minimapCanvas = document.querySelector('canvas:not(#gameCanvas)') as HTMLCanvasElement;
+        if (minimapCanvas) {
+            minimapCanvas.style.display = this.isInAlternateDimension ? 'block' : 'none';
+        }
+    }
+
+    // Helper method to calculate distance between two points
+    private distanceBetween(x1: number, y1: number, x2: number, y2: number): number {
+        return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
     }
 }

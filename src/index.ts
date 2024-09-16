@@ -7,6 +7,8 @@ class GameManager {
     private game: Game | null = null;
     private titleScreen: TitleScreen;
     private controlToggleButton: HTMLButtonElement;
+    private minimapCanvas: HTMLCanvasElement;
+    private minimapContext: CanvasRenderingContext2D;
 
     constructor() {
         this.canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
@@ -19,6 +21,19 @@ class GameManager {
         this.controlToggleButton.style.right = '10px';
         this.controlToggleButton.style.zIndex = '1000';
         document.body.appendChild(this.controlToggleButton);
+
+        // Create minimap canvas
+        this.minimapCanvas = document.createElement('canvas');
+        this.minimapCanvas.width = 200;
+        this.minimapCanvas.height = 200;
+        this.minimapCanvas.style.position = 'absolute';
+        this.minimapCanvas.style.top = '100px';
+        this.minimapCanvas.style.right = '10px';
+        this.minimapCanvas.style.zIndex = '1000';
+        this.minimapCanvas.style.border = '1px solid white';
+        this.minimapCanvas.style.display = 'none'; // Initially hide the minimap
+        document.body.appendChild(this.minimapCanvas);
+        this.minimapContext = this.minimapCanvas.getContext('2d')!;
     }
 
     public init() {
@@ -38,6 +53,7 @@ class GameManager {
     private showTitleScreen() {
         this.titleScreen.show();
         this.controlToggleButton.style.display = 'none';
+        this.minimapCanvas.style.display = 'none';
     }
 
     private startGame() {
@@ -45,6 +61,8 @@ class GameManager {
         this.setupFullscreenButton();
         this.setupControlToggleButton();
         this.controlToggleButton.style.display = 'block';
+        // Remove this line: this.minimapCanvas.style.display = 'block';
+        this.updateMinimap();
     }
 
     private setupFullscreenButton() {
@@ -66,6 +84,13 @@ class GameManager {
         } else if (document.exitFullscreen) {
             document.exitFullscreen();
         }
+    }
+
+    private updateMinimap() {
+        if (this.game) {
+            this.game.renderMinimap(this.minimapContext, this.minimapCanvas.width, this.minimapCanvas.height);
+        }
+        requestAnimationFrame(() => this.updateMinimap());
     }
 }
 
