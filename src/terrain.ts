@@ -145,14 +145,8 @@ export class Terrain {
         const blockX = Math.floor(x / 10);
         const blockY = Math.floor(y / 10);
         if (this.blocks[blockX] && this.blocks[blockX][blockY] && this.blocks[blockX][blockY].present) {
-            const block = this.blocks[blockX][blockY];
-            if (block.type === 'bedrock') {
-                if (block.durability && block.durability > 1) {
-                    this.blocks[blockX][blockY] = { ...block, durability: block.durability - 1 };
-                    return null; // Return null to indicate the block wasn't fully removed
-                }
-            }
-            this.blocks[blockX][blockY] = { ...block, present: false };
+            const block = { ...this.blocks[blockX][blockY], present: false };
+            this.blocks[blockX][blockY] = block;
             return block;
         }
         return null;

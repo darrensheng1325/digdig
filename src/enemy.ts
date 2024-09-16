@@ -10,7 +10,7 @@ export class Enemy extends Player {
     constructor(x: number, y: number, terrainWidth: number, terrainHeight: number, context: CanvasRenderingContext2D, target: Player, terrain: Terrain) {
         super(x, y, 50, 5, context, terrain);
         this.target = target;
-        this.setSize(20); // Set initial size
+        this.setSize(20); // Use this.setSize instead of super.setSize
     }
 
     // Change protected to public
@@ -116,19 +116,8 @@ export class Enemy extends Player {
         return nearestGold;
     }
 
-    protected handleDugBlock(block: Block) {
-        if (block.type === 'uranium') {
-            this.takeDamage(5);
-        } else if (block.type === 'lava') {
-            this.takeDamage(20);
-        } else if (block.type === 'quartz') {
-            this.adjustShield(10);
-        } else if (block.type === 'gold_ore') {
-            this.adjustGoldScore(1);
-        } else {
-            this.adjustScore(1);
-        }
-        this.updateSize();
+    public handleDugBlock(block: Block) {
+        super.handleDugBlock(block);
     }
 
     private updateSize() {

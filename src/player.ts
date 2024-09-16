@@ -365,7 +365,7 @@ export class Player {
 
     private calculateLevelAndXP(): void {
         const oldLevel = this.level;
-        this.level = Math.floor(Math.sqrt(this.goldScore / 100)) + 1;
+        this.level = Math.max(1, Math.floor(Math.sqrt(this.goldScore / 100)) + 1);
         this.xp = this.goldScore % 100;
         this.xpToNextLevel = 100;
 

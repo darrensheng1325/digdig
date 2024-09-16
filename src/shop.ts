@@ -113,7 +113,8 @@ export class Shop {
             const emoteY = startY + Math.floor(index / columns) * (emoteSize + padding);
 
             if (x >= emoteX && x < emoteX + emoteSize && y >= emoteY && y < emoteY + emoteSize) {
-                if (this.player.buyEmote(emote)) {
+                const bought = this.player.buyEmote(emote);
+                if (bought) {
                     console.log(`Bought emote: ${Emote[emote]}`);
                     this.updateAvailableEmotes();
                 } else {
