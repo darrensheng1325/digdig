@@ -4,7 +4,7 @@ export class Shop {
     private isOpen: boolean = false;
     private player: Player;
     private context: CanvasRenderingContext2D;
-    private allEmotes: Emote[] = Object.values(Emote).filter(e => typeof e === 'number') as Emote[];
+    private allEmotes: Emote[] = (Object.values(Emote) as any[]).filter(e => typeof e === 'number') as Emote[];
     private availableEmotes: Emote[] = [];
     private readonly SHOP_SIZE: number = 12; // Number of emotes displayed in the shop
 
@@ -138,7 +138,7 @@ export class Shop {
             case Emote.Sleepy: return '😴';
             case Emote.Excited: return '🤩';
             case Emote.Nervous: return '😰';
-            case Emote.Sick: return '🤢';
+            case Emote.Sick: return '��';
             case Emote.Rich: return '🤑';
             case Emote.Strong: return '💪';
             case Emote.Scared: return '😱';

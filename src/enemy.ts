@@ -14,11 +14,11 @@ export class Enemy extends Player {
     }
 
     // Change protected to public
-    public getSpeed(): number {
+    public override getSpeed(): number {
         return super.getSpeed() * 0.2; // 20% of the player's speed
     }
 
-    public update(terrain: Terrain, screenWidth: number, screenHeight: number, cameraX: number, cameraY: number) {
+    public override update(terrain: Terrain, screenWidth: number, screenHeight: number, cameraX: number, cameraY: number) {
         super.update(terrain, screenWidth, screenHeight, cameraX, cameraY);
 
         if (this.isOffScreen(screenWidth, screenHeight, cameraX, cameraY)) {
@@ -41,7 +41,7 @@ export class Enemy extends Player {
         }
     }
 
-    public updateEmote(deltaTime: number) {
+    public override updateEmote(deltaTime: number) {
         super.updateEmote(deltaTime);
     }
 
@@ -116,7 +116,7 @@ export class Enemy extends Player {
         return nearestGold;
     }
 
-    protected handleDugBlock(block: Block) {
+    protected override handleDugBlock(block: Block) {
         if (block.type === 'uranium') {
             this.takeDamage(2); // Reduced damage from uranium
         } else if (block.type === 'lava') {
@@ -137,13 +137,13 @@ export class Enemy extends Player {
         this.setSize(newSize);
     }
 
-    public setPosition(x: number, y: number) {
+    public override setPosition(x: number, y: number) {
         this.x = x;
         this.y = y;
     }
 
     // Override the draw method to change the color of the enemy and make a shorter frown
-    public draw(visibleWidth: number, visibleHeight: number) {
+    public override draw(visibleWidth: number, visibleHeight: number) {
         super.draw(visibleWidth, visibleHeight);
         
         // Add any enemy-specific drawing code here
