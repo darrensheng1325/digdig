@@ -1,5 +1,12 @@
 import { Terrain, Block } from './terrain';
 
+export enum Emote {
+    Happy, Sad, Angry, Surprised, Love,
+    Cool, Thinking, Laughing, Wink, Confused,
+    Sleepy, Excited, Nervous, Sick, Rich,
+    Strong, Scared, Crazy, Evil, Dead
+}
+
 export class Player {
     protected x: number;
     protected y: number;
@@ -21,6 +28,9 @@ export class Player {
     private level: number = 1;
     private xp: number = 0;
     private xpToNextLevel: number = 100;
+    private currentEmote: Emote | null = null;
+    private emoteDisplayTime: number = 0;
+    private readonly EMOTE_DURATION: number = 2000; // 2 seconds
 
     constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D, terrain: Terrain) {
         this.x = x;
@@ -253,6 +263,11 @@ export class Player {
 
         this.context.fillStyle = 'yellow';
         this.context.fillRect(this.x - barWidth / 2, this.y - this.size / 2 - 25, barWidth * xpPercentage, barHeight);
+
+        // Draw emote if active
+        if (this.currentEmote !== null) {
+            this.drawEmote();
+        }
     }
 
     getX() { return this.x; }
@@ -407,5 +422,63 @@ export class Player {
 
     public getXPToNextLevel(): number {
         return this.xpToNextLevel;
+    }
+
+    public displayEmote(emote: Emote) {
+        this.currentEmote = emote;
+        this.emoteDisplayTime = this.EMOTE_DURATION;
+    }
+
+    public updateEmote(deltaTime: number) {
+        if (this.emoteDisplayTime > 0) {
+            this.emoteDisplayTime -= deltaTime;
+            if (this.emoteDisplayTime <= 0) {
+                this.currentEmote = null;
+            }
+        }
+    }
+
+    private drawEmote() {
+        const emoteSize = this.size / 2;
+        const emoteY = this.y - this.size - emoteSize - 10;
+
+        this.context.fillStyle = 'yellow';
+        this.context.beginPath();
+        this.context.arc(this.x, emoteY, emoteSize, 0, Math.PI * 2);
+        this.context.fill();
+
+        this.context.fillStyle = 'black';
+        this.context.font = `${emoteSize}px Arial`;
+        this.context.textAlign = 'center';
+        this.context.textBaseline = 'middle';
+
+        let emoteText = this.getEmoteText(this.currentEmote!);
+        this.context.fillText(emoteText, this.x, emoteY);
+    }
+
+    private getEmoteText(emote: Emote): string {
+        switch (emote) {
+            case Emote.Happy: return '😊';
+            case Emote.Sad: return '😢';
+            case Emote.Angry: return '😠';
+            case Emote.Surprised: return '😮';
+            case Emote.Love: return '😍';
+            case Emote.Cool: return '😎';
+            case Emote.Thinking: return '🤔';
+            case Emote.Laughing: return '😂';
+            case Emote.Wink: return '😉';
+            case Emote.Confused: return '😕';
+            case Emote.Sleepy: return '😴';
+            case Emote.Excited: return '🤩';
+            case Emote.Nervous: return '😰';
+            case Emote.Sick: return '🤢';
+            case Emote.Rich: return '🤑';
+            case Emote.Strong: return '💪';
+            case Emote.Scared: return '😱';
+            case Emote.Crazy: return '🤪';
+            case Emote.Evil: return '😈';
+            case Emote.Dead: return '💀';
+            default: return '';
+        }
     }
 }

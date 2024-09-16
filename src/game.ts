@@ -1,4 +1,4 @@
-import { Player } from './player';
+import { Player, Emote } from './player';
 import { Enemy } from './enemy';
 import { Terrain, Block } from './terrain';
 
@@ -19,6 +19,10 @@ export class Game {
     private minZoom: number = 0.01; // Minimum zoom (maximum zoom out)
     private maxZoom: number = 1; // Maximum zoom (no zoom out)
     private zoomCap: number = 0.4; // Set the zoom cap to 40%
+    private lastUpdateTime: number = 0;
+    private isEmoteWheelOpen: boolean = false;
+    private emoteWheelRadius: number = 100;
+    private selectedEmote: Emote | null = null;
 
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -42,8 +46,10 @@ export class Game {
         this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
         this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
         this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+        window.addEventListener('keydown', (e) => this.handleEmoteInput(e));
         this.resizeCanvas();
         this.gameLoop();
+        this.lastUpdateTime = Date.now();
     }
 
     public resizeCanvas() {
@@ -52,6 +58,9 @@ export class Game {
     }
 
     private handleKeyDown(event: KeyboardEvent) {
+        if (event.key === 'e') {
+            this.toggleEmoteWheel();
+        }
         this.keysPressed.add(event.key);
     }
 
@@ -60,7 +69,12 @@ export class Game {
     }
 
     private handleMouseMove(event: MouseEvent) {
-        if (this.isMouseControl) {
+        if (this.isEmoteWheelOpen) {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            this.selectedEmote = this.getEmoteFromPosition(x, y);
+        } else if (this.isMouseControl) {
             const rect = this.canvas.getBoundingClientRect();
             const x = event.clientX - rect.left + this.cameraX;
             const y = event.clientY - rect.top + this.cameraY;
@@ -77,7 +91,10 @@ export class Game {
     }
 
     private handleMouseDown(event: MouseEvent) {
-        if (this.isMouseControl) {
+        if (this.isEmoteWheelOpen && this.selectedEmote !== null) {
+            this.player.displayEmote(this.selectedEmote);
+            this.toggleEmoteWheel();
+        } else if (this.isMouseControl) {
             this.player.startDigging();
         }
     }
@@ -88,6 +105,27 @@ export class Game {
         }
     }
 
+    private handleEmoteInput(event: KeyboardEvent) {
+        switch (event.key) {
+            case '1': this.player.displayEmote(Emote.Happy); break;
+            case '2': this.player.displayEmote(Emote.Sad); break;
+            case '3': this.player.displayEmote(Emote.Angry); break;
+            case '4': this.player.displayEmote(Emote.Surprised); break;
+            case '5': this.player.displayEmote(Emote.Love); break;
+            case '6': this.player.displayEmote(Emote.Cool); break;
+            case '7': this.player.displayEmote(Emote.Thinking); break;
+            case '8': this.player.displayEmote(Emote.Laughing); break;
+            case '9': this.player.displayEmote(Emote.Wink); break;
+            case '0': this.player.displayEmote(Emote.Confused); break;
+            case 'q': this.player.displayEmote(Emote.Sleepy); break;
+            case 'w': this.player.displayEmote(Emote.Excited); break;
+            case 'e': this.player.displayEmote(Emote.Nervous); break;
+            case 'r': this.player.displayEmote(Emote.Sick); break;
+            case 't': this.player.displayEmote(Emote.Rich); break;
+            case 'y': this.player.displayEmote(Emote.Strong); break;
+        }
+    }
+
     private gameLoop() {
         this.update();
         this.render();
@@ -95,6 +133,10 @@ export class Game {
     }
 
     private update() {
+        const currentTime = Date.now();
+        const deltaTime = currentTime - this.lastUpdateTime;
+        this.lastUpdateTime = currentTime;
+
         if (!this.isMouseControl) {
             // Existing keyboard control logic
             let dx = 0;
@@ -118,7 +160,6 @@ export class Game {
         console.log(`Player position: (${this.player.getX()}, ${this.player.getY()}), Digging: ${this.player.isDigging()}`);
 
         // Health recovery over time (shield does not recover)
-        const currentTime = Date.now();
         if (currentTime - this.lastHealthRecoveryTime > 500) { // Recover health every 0.5 seconds
             this.player.recoverHealth(2); // Recover 2 health points
             this.lastHealthRecoveryTime = currentTime;
@@ -169,6 +210,12 @@ export class Game {
             const enemiesToSpawn = Math.min(5, this.maxEnemies - this.enemies.length); // Increased from 3 to 5
             this.spawnEnemies(enemiesToSpawn);
         }
+
+        // Update player's emote
+        this.player.updateEmote(deltaTime);
+
+        // Update enemies' emotes
+        this.enemies.forEach(enemy => enemy.updateEmote(deltaTime));
     }
 
     private updateZoom() {
@@ -249,6 +296,10 @@ export class Game {
 
         // Comment out or remove this line if you're not using drawScore anymore
         // this.drawScore();
+
+        if (this.isEmoteWheelOpen) {
+            this.renderEmoteWheel();
+        }
     }
 
     private isEnemyVisible(enemy: Enemy, visibleWidth: number, visibleHeight: number): boolean {
@@ -286,6 +337,82 @@ export class Game {
         this.isMouseControl = !this.isMouseControl;
         if (this.isMouseControl) {
             this.keysPressed.clear();  // Clear any pressed keys when switching to mouse control
+        }
+    }
+
+    private toggleEmoteWheel() {
+        this.isEmoteWheelOpen = !this.isEmoteWheelOpen;
+        if (!this.isEmoteWheelOpen) {
+            this.selectedEmote = null;
+        }
+    }
+
+    private getEmoteFromPosition(x: number, y: number): Emote | null {
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        const dx = x - centerX;
+        const dy = y - centerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance <= this.emoteWheelRadius) {
+            const angle = Math.atan2(dy, dx);
+            const index = Math.floor(((angle + Math.PI) / (2 * Math.PI)) * Object.keys(Emote).length / 2);
+            return index as Emote;
+        }
+
+        return null;
+    }
+
+    private renderEmoteWheel() {
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        const emoteCount = Object.keys(Emote).length / 2;
+        const angleStep = (2 * Math.PI) / emoteCount;
+
+        this.context.save();
+        this.context.beginPath();
+        this.context.arc(centerX, centerY, this.emoteWheelRadius, 0, 2 * Math.PI);
+        this.context.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        this.context.fill();
+
+        for (let i = 0; i < emoteCount; i++) {
+            const angle = i * angleStep;
+            const x = centerX + Math.cos(angle) * this.emoteWheelRadius * 0.8;
+            const y = centerY + Math.sin(angle) * this.emoteWheelRadius * 0.8;
+
+            this.context.font = '20px Arial';
+            this.context.fillStyle = i === this.selectedEmote ? 'yellow' : 'white';
+            this.context.textAlign = 'center';
+            this.context.textBaseline = 'middle';
+            this.context.fillText(this.getEmoteText(i as Emote), x, y);
+        }
+
+        this.context.restore();
+    }
+
+    private getEmoteText(emote: Emote): string {
+        switch (emote) {
+            case Emote.Happy: return '😊';
+            case Emote.Sad: return '😢';
+            case Emote.Angry: return '😠';
+            case Emote.Surprised: return '😮';
+            case Emote.Love: return '😍';
+            case Emote.Cool: return '😎';
+            case Emote.Thinking: return '🤔';
+            case Emote.Laughing: return '😂';
+            case Emote.Wink: return '😉';
+            case Emote.Confused: return '😕';
+            case Emote.Sleepy: return '😴';
+            case Emote.Excited: return '🤩';
+            case Emote.Nervous: return '😰';
+            case Emote.Sick: return '🤢';
+            case Emote.Rich: return '🤑';
+            case Emote.Strong: return '💪';
+            case Emote.Scared: return '😱';
+            case Emote.Crazy: return '🤪';
+            case Emote.Evil: return '😈';
+            case Emote.Dead: return '💀';
+            default: return '';
         }
     }
 }

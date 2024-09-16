@@ -1,4 +1,4 @@
-import { Player } from './player';
+import { Player, Emote } from './player';
 import { Terrain, Block } from './terrain';
 
 export class Enemy extends Player {
@@ -33,6 +33,12 @@ export class Enemy extends Player {
         }
 
         this.updateRingRotation();
+
+        // Randomly display emotes
+        if (Math.random() < 0.001) { // 0.1% chance each update
+            const randomEmote = Math.floor(Math.random() * Object.keys(Emote).length / 2) as Emote;
+            this.displayEmote(randomEmote);
+        }
     }
 
     private isOffScreen(screenWidth: number, screenHeight: number, cameraX: number, cameraY: number): boolean {
