@@ -234,12 +234,34 @@ export class Game {
         const endY = Math.ceil((this.player.getY() + visibleHeight / 2) / 10);
         
         this.terrain.generateTerrain(this.context, startX, startY, endX, endY);
-        this.enemies.forEach(enemy => enemy.draw());
-        this.player.draw();
+        
+        // Draw enemies
+        this.enemies.forEach(enemy => {
+            if (this.isEnemyVisible(enemy, visibleWidth, visibleHeight)) {
+                enemy.draw(visibleWidth, visibleHeight);
+            }
+        });
+        
+        // Draw player
+        this.player.draw(visibleWidth, visibleHeight);
         
         this.context.restore();
 
         this.drawScore();
+    }
+
+    private isEnemyVisible(enemy: Enemy, visibleWidth: number, visibleHeight: number): boolean {
+        const enemyX = enemy.getX();
+        const enemyY = enemy.getY();
+        const playerX = this.player.getX();
+        const playerY = this.player.getY();
+
+        return (
+            enemyX >= playerX - visibleWidth / 2 &&
+            enemyX <= playerX + visibleWidth / 2 &&
+            enemyY >= playerY - visibleHeight / 2 &&
+            enemyY <= playerY + visibleHeight / 2
+        );
     }
 
     private drawScore() {

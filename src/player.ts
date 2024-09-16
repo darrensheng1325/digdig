@@ -18,6 +18,9 @@ export class Player {
     private _isDigging: boolean = false; // Changed from isDigging to _isDigging
     private maxSize: number = 1000; // Changed from 100 to 1000
     private goldScore: number = 0;
+    private level: number = 1;
+    private xp: number = 0;
+    private xpToNextLevel: number = 100;
 
     constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D, terrain: Terrain) {
         this.x = x;
@@ -28,6 +31,7 @@ export class Player {
         this.context = context;
         this.terrain = terrain; // Add this line
         this.loadGoldScore(); // Load the gold score from local storage
+        this.calculateLevelAndXP();
     }
 
     move(dx: number, dy: number) {
@@ -55,8 +59,10 @@ export class Player {
         const minSize = 20;
         const normalizedSize = Math.min((this.size - minSize) / (this.maxSize - minSize), 1);
         const speedDecrease = normalizedSize * 0.95; // Increased from 0.8 to 0.95 for more significant slowdown at larger sizes
-        const speed = this.baseSpeed - this.baseSpeed * speedDecrease;
-        return Math.max(this.minSpeed, speed);
+        const baseSpeed = Math.max(this.minSpeed, this.baseSpeed - this.baseSpeed * speedDecrease);
+        
+        // Include level bonus
+        return baseSpeed * (1 + (this.level - 1) * 0.05); // 5% speed increase per level
     }
 
     dig(terrain: Terrain) {
@@ -105,7 +111,14 @@ export class Player {
         this.setSize(this.getScore() + this.getGoldScore());
     }
 
-    draw() {
+    draw(screenWidth: number, screenHeight: number) {
+        // Draw level in the top left corner
+        this.context.fillStyle = 'white';
+        this.context.font = '24px Arial';
+        this.context.textAlign = 'left';
+        this.context.textBaseline = 'top';
+        this.context.fillText(`Level: ${this.level}`, 10, 10);
+
         this.updateRingRotation();
         // Update ring rotation
         this.ringRotation += Math.PI / 180; // Rotate 1 degree (in radians) per frame
@@ -228,6 +241,20 @@ export class Player {
         
         this.context.fillStyle = 'gold';
         this.context.fillText(`${this.goldScore}`, this.x + this.size / 2, this.y - this.size / 2 - 20);
+
+        // Draw level and XP bar
+        const xpPercentage = this.xp / this.xpToNextLevel;
+
+        this.context.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        this.context.fillRect(this.x - barWidth / 2, this.y - this.size / 2 - 25, barWidth, barHeight);
+
+        this.context.fillStyle = 'yellow';
+        this.context.fillRect(this.x - barWidth / 2, this.y - this.size / 2 - 25, barWidth * xpPercentage, barHeight);
+
+        this.context.fillStyle = 'white';
+        this.context.font = `${this.size / 4}px Arial`;
+        this.context.textAlign = 'center';
+        this.context.fillText(`Lvl ${this.level}`, this.x, this.y - this.size / 2 - 30);
     }
 
     getX() { return this.x; }
@@ -250,14 +277,15 @@ export class Player {
     setSize(score: number) {
         const minSize = 20;
         const growthFactor = 1.5; // Increased from 0.5 to 1.5 to allow for larger growth
+        const levelBonus = (this.level - 1) * 0.1; // 10% size increase per level
 
-        // Calculate new size based on score
-        const newSize = minSize + Math.sqrt(score) * growthFactor;
+        // Calculate new size based on score and level
+        const newSize = (minSize + Math.sqrt(score) * growthFactor) * (1 + levelBonus);
 
         // Clamp the size between minSize and maxSize
         this.size = Math.max(minSize, Math.min(this.maxSize, newSize));
         
-        console.log(`Player size updated. Score: ${score}, New size: ${this.size}`);
+        console.log(`Player size updated. Score: ${score}, Level: ${this.level}, New size: ${this.size}`);
     }
 
     public getSize(): number {
@@ -312,6 +340,7 @@ export class Player {
     public adjustGoldScore(amount: number) {
         this.goldScore += amount;
         this.saveGoldScore(); // Save the gold score after each adjustment
+        this.calculateLevelAndXP();
         console.log(`Gold score adjusted. New gold score: ${this.goldScore}`);
     }
 
@@ -324,5 +353,41 @@ export class Player {
         if (savedGoldScore !== null) {
             this.goldScore = parseInt(savedGoldScore, 10);
         }
+    }
+
+    private calculateLevelAndXP(): void {
+        const oldLevel = this.level;
+        this.level = Math.floor(Math.sqrt(this.goldScore / 100)) + 1;
+        this.xp = this.goldScore % 100;
+        this.xpToNextLevel = 100;
+
+        if (this.level > oldLevel) {
+            console.log(`Level up! New level: ${this.level}`);
+            this.onLevelUp();
+        }
+    }
+
+    private onLevelUp(): void {
+        // Increase max health and shield
+        const maxHealth = 100 + (this.level - 1) * 10;
+        const maxShield = 100 + (this.level - 1) * 5;
+
+        this.health = Math.min(this.health, maxHealth);
+        this.shield = Math.min(this.shield, maxShield);
+
+        // Increase base speed slightly
+        this.baseSpeed = 4 + (this.level - 1) * 0.1;
+    }
+
+    public getLevel(): number {
+        return this.level;
+    }
+
+    public getXP(): number {
+        return this.xp;
+    }
+
+    public getXPToNextLevel(): number {
+        return this.xpToNextLevel;
     }
 }

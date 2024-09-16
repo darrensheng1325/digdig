@@ -5,6 +5,7 @@ export class Enemy extends Player {
     private target: Player;
     private randomDirection: { x: number, y: number } = { x: 0, y: 0 };
     private randomMovementDuration: number = 0;
+    private goldDetectionRadius: number = 100; // Radius to detect gold
 
     constructor(x: number, y: number, terrainWidth: number, terrainHeight: number, context: CanvasRenderingContext2D, target: Player, terrain: Terrain) {
         super(x, y, 50, 5, context, terrain);
@@ -23,7 +24,7 @@ export class Enemy extends Player {
         if (this.isOffScreen(screenWidth, screenHeight, cameraX, cameraY)) {
             this.moveRandomly();
         } else {
-            this.moveTowardsTarget();
+            this.moveTowardsTarget(terrain);
         }
 
         const dugBlocks = this.dig(terrain);
@@ -54,9 +55,20 @@ export class Enemy extends Player {
         this.randomMovementDuration--;
     }
 
-    private moveTowardsTarget() {
-        const dx = this.target.getX() - this.getX();
-        const dy = this.target.getY() - this.getY();
+    private moveTowardsTarget(terrain: Terrain) {
+        const nearestGold = this.findNearestGold(terrain);
+        let targetX, targetY;
+
+        if (nearestGold) {
+            targetX = nearestGold.x;
+            targetY = nearestGold.y;
+        } else {
+            targetX = this.target.getX();
+            targetY = this.target.getY();
+        }
+
+        const dx = targetX - this.getX();
+        const dy = targetY - this.getY();
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         if (distance > 0) {
@@ -65,6 +77,33 @@ export class Enemy extends Player {
             const moveY = (dy / distance) * speed;
             this.move(moveX, moveY);
         }
+    }
+
+    private findNearestGold(terrain: Terrain): { x: number, y: number } | null {
+        const startX = Math.floor((this.getX() - this.goldDetectionRadius) / 10);
+        const startY = Math.floor((this.getY() - this.goldDetectionRadius) / 10);
+        const endX = Math.ceil((this.getX() + this.goldDetectionRadius) / 10);
+        const endY = Math.ceil((this.getY() + this.goldDetectionRadius) / 10);
+
+        let nearestGold = null;
+        let nearestDistance = Infinity;
+
+        for (let x = startX; x <= endX; x++) {
+            for (let y = startY; y <= endY; y++) {
+                const block = terrain.getBlock(x * 10, y * 10);
+                if (block && block.type === 'gold_ore' && block.present) {
+                    const dx = x * 10 - this.getX();
+                    const dy = y * 10 - this.getY();
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < nearestDistance) {
+                        nearestDistance = distance;
+                        nearestGold = { x: x * 10, y: y * 10 };
+                    }
+                }
+            }
+        }
+
+        return nearestGold;
     }
 
     protected handleDugBlock(block: Block) {
@@ -94,119 +133,22 @@ export class Enemy extends Player {
     }
 
     // Override the draw method to change the color of the enemy and make a shorter frown
-    public draw() {
+    public draw(visibleWidth: number, visibleHeight: number) {
+        super.draw(visibleWidth, visibleHeight);
+        
+        // Add any enemy-specific drawing code here
+        // For example, you might want to change the color or add some distinguishing feature
+        
         const context = this.getContext();
         const x = this.getX();
         const y = this.getY();
         const size = this.getSize();
 
-        // Draw curved ring pattern (filled with black, like the player)
-        context.strokeStyle = 'black';
-        context.fillStyle = 'black';
-        context.lineWidth = 5;
-
-        const ringRadius = size / 2 + size / 6;
-        const curveCount = 8;
-        const curveAngle = (Math.PI * 2) / curveCount;
-        const curveDepth = size / 4;
-
-        context.beginPath();
-        for (let i = 0; i < curveCount; i++) {
-            const startAngle = i * curveAngle + this.ringRotation;
-            const endAngle = (i + 1) * curveAngle + this.ringRotation;
-            const midAngle = (startAngle + endAngle) / 2;
-
-            const startX = x + Math.cos(startAngle) * ringRadius;
-            const startY = y + Math.sin(startAngle) * ringRadius;
-            const endX = x + Math.cos(endAngle) * ringRadius;
-            const endY = y + Math.sin(endAngle) * ringRadius;
-            const controlX = x + Math.cos(midAngle) * (ringRadius - curveDepth);
-            const controlY = y + Math.sin(midAngle) * (ringRadius - curveDepth);
-
-            if (i === 0) {
-                context.moveTo(startX, startY);
-            }
-            context.quadraticCurveTo(controlX, controlY, endX, endY);
-        }
-        context.closePath();
-        context.fill();
-        context.stroke();
-
-        // Draw enemy body (red circle)
-        context.fillStyle = 'red';
-        context.beginPath();
-        context.arc(x, y, size / 2, 0, Math.PI * 2);
-        context.fill();
-
-        // Draw face (similar to player but with a frown)
-        const eyeWidth = size / 6;
-        const eyeHeight = size / 4;
-        const eyeY = y - eyeHeight / 2;
-
-        // Left eye
-        context.fillStyle = 'white';
-        context.fillRect(x - size / 6 - eyeWidth / 2, eyeY, eyeWidth, eyeHeight);
-
-        // Right eye
-        context.fillRect(x + size / 6 - eyeWidth / 2, eyeY, eyeWidth, eyeHeight);
-
-        // Draw pupils (rectangular)
-        context.fillStyle = 'black';
-        const pupilWidth = eyeWidth * 0.6;
-        const pupilHeight = eyeHeight * 0.6;
-        const maxPupilOffset = (eyeWidth - pupilWidth) / 2;
-
-        // Calculate pupil offset based on movement direction
-        const pupilOffsetX = this.randomDirection.x * maxPupilOffset;
-        const pupilOffsetY = this.randomDirection.y * maxPupilOffset;
-
-        // Left pupil
-        context.fillRect(
-            x - size / 6 - pupilWidth / 2 + pupilOffsetX,
-            eyeY + (eyeHeight - pupilHeight) / 2 + pupilOffsetY,
-            pupilWidth,
-            pupilHeight
-        );
-
-        // Right pupil
-        context.fillRect(
-            x + size / 6 - pupilWidth / 2 + pupilOffsetX,
-            eyeY + (eyeHeight - pupilHeight) / 2 + pupilOffsetY,
-            pupilWidth,
-            pupilHeight
-        );
-
-        // Draw frown (inverted smile, moved down)
-        context.strokeStyle = 'black';
+        // Draw a red outline for the enemy
+        context.strokeStyle = 'red';
         context.lineWidth = 2;
         context.beginPath();
-        context.arc(x, y + size / 4, size / 5, 1.2 * Math.PI, 1.8 * Math.PI); // Changed y-coordinate
+        context.arc(x, y, size / 2 + 2, 0, Math.PI * 2);
         context.stroke();
-
-        // Draw health and shield bar
-        const barWidth = size * 2;
-        const barHeight = 5;
-        const healthPercentage = this.getHealth() / 100;
-        const shieldPercentage = this.getShield() / 100;
-
-        context.fillStyle = 'darkred';
-        context.fillRect(x - barWidth / 2, y - size / 2 - 10, barWidth, barHeight);
-
-        context.fillStyle = 'red';
-        context.fillRect(x - barWidth / 2, y - size / 2 - 10, barWidth * healthPercentage, barHeight);
-
-        context.fillStyle = 'purple';
-        context.fillRect(
-            x - barWidth / 2 + barWidth * healthPercentage, 
-            y - size / 2 - 10, 
-            barWidth * shieldPercentage, 
-            barHeight
-        );
-
-        // Draw gold score
-        context.fillStyle = 'gold';
-        context.font = `${size / 3}px Arial`;
-        context.textAlign = 'center';
-        context.fillText(`${this.getGoldScore()}`, x, y - size / 2 - 20);
     }
 }

@@ -31,7 +31,7 @@ export class TitleScreen {
         // Create and draw a player
         const player = new Player(this.canvas.width / 2, this.canvas.height / 2, 100, 10, this.context, tempTerrain);
         player.setSize(40);
-        player.draw();
+        player.draw(this.canvas.width, this.canvas.height);
 
         // Create and draw some enemies
         for (let i = 0; i < 5; i++) {
@@ -45,7 +45,7 @@ export class TitleScreen {
                 tempTerrain
             );
             enemy.setSize(30);
-            enemy.draw();
+            enemy.draw(this.canvas.width, this.canvas.height);  // Pass canvas width and height
         }
 
         // Title

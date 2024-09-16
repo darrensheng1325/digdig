@@ -184,6 +184,15 @@ export class Terrain {
         }
     }
 
+    public getBlock(x: number, y: number): Block | null {
+        const blockX = Math.floor(x / 10);
+        const blockY = Math.floor(y / 10);
+        if (this.blocks[blockX] && this.blocks[blockX][blockY]) {
+            return this.blocks[blockX][blockY];
+        }
+        return null;
+    }
+
     getWidth(): number {
         return this.width;
     }
