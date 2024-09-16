@@ -15,32 +15,34 @@ export class Player {
     private shield: number;
     private context: CanvasRenderingContext2D;
     private movementDirection: { x: number, y: number } = { x: 0, y: 0 };
-    private baseSpeed: number = 4; // Increased slightly from 3 to 4
-    private minSpeed: number = 0.3; // Decreased from 0.5 to 0.3
-    private maxSpeed: number = 5; // Reduced maximum speed
-    private optimalSize: number = 40; // Size at which the player is fastest
-    protected ringRotation: number = 0; // Change from private to protected
-    protected terrain: Terrain; // Add this line
-    private score: number = 0; // Add this line
-    private _isDigging: boolean = false; // Changed from isDigging to _isDigging
-    private maxSize: number = 1000; // Changed from 100 to 1000
+    private baseSpeed: number = 4;
+    private minSpeed: number = 0.3;
+    private maxSpeed: number = 5;
+    private optimalSize: number = 40;
+    protected ringRotation: number = 0;
+    protected terrain: Terrain;
+    private score: number = 0;
+    private _isDigging: boolean = false;
+    private maxSize: number = 1000;
     private goldScore: number = 0;
     private level: number = 1;
     private xp: number = 0;
     private xpToNextLevel: number = 100;
     private currentEmote: Emote | null = null;
     private emoteDisplayTime: number = 0;
-    private readonly EMOTE_DURATION: number = 2000; // 2 seconds
+    private readonly EMOTE_DURATION: number = 2000;
+    private ownedEmotes: Set<Emote> = new Set([Emote.Happy, Emote.Sad, Emote.Angry, Emote.Surprised]);
 
     constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D, terrain: Terrain) {
         this.x = x;
         this.y = y;
-        this.size = 20; // Initial size
+        this.size = 20;
         this.health = health;
         this.shield = 0;
         this.context = context;
-        this.terrain = terrain; // Add this line
-        this.loadGoldScore(); // Load the gold score from local storage
+        this.terrain = terrain;
+        this.loadGoldScore();
+        this.loadOwnedEmotes();
         this.calculateLevelAndXP();
     }
 
@@ -49,30 +51,25 @@ export class Player {
         const newX = this.x + dx * speed;
         const newY = this.y + dy * speed;
 
-        // Check if the new position is within the terrain boundaries
         if (newX >= 0 && newX < this.terrain.getWidth() && newY >= 0 && newY < this.terrain.getHeight()) {
             this.x = newX;
             this.y = newY;
-            // Update movement direction
             const length = Math.sqrt(dx * dx + dy * dy);
             if (length > 0) {
                 this.movementDirection = { x: dx / length, y: dy / length };
             }
             
-            // Dig at the new position
             this.dig(this.terrain);
         }
     }
 
-    // Calculate speed based on size
     public getSpeed(): number {
         const minSize = 20;
         const normalizedSize = Math.min((this.size - minSize) / (this.maxSize - minSize), 1);
-        const speedDecrease = normalizedSize * 0.95; // Increased from 0.8 to 0.95 for more significant slowdown at larger sizes
+        const speedDecrease = normalizedSize * 0.95;
         const baseSpeed = Math.max(this.minSpeed, this.baseSpeed - this.baseSpeed * speedDecrease);
         
-        // Include level bonus
-        return baseSpeed * (1 + (this.level - 1) * 0.05); // 5% speed increase per level
+        return baseSpeed * (1 + (this.level - 1) * 0.05);
     }
 
     dig(terrain: Terrain) {
@@ -90,7 +87,6 @@ export class Player {
             }
         }
 
-        // Handle dug blocks
         for (const block of dugBlocks) {
             this.handleDugBlock(block);
         }
@@ -122,9 +118,8 @@ export class Player {
     }
 
     draw(screenWidth: number, screenHeight: number) {
-        // Draw level in the top left corner
         this.context.save();
-        this.context.setTransform(1, 0, 0, 1, 0, 0); // Reset the transformation
+        this.context.setTransform(1, 0, 0, 1, 0, 0);
         this.context.fillStyle = 'white';
         this.context.font = '24px Arial';
         this.context.textAlign = 'left';
@@ -133,18 +128,16 @@ export class Player {
         this.context.restore();
 
         this.updateRingRotation();
-        // Update ring rotation
-        this.ringRotation += Math.PI / 180; // Rotate 1 degree (in radians) per frame
+        this.ringRotation += Math.PI / 180;
         if (this.ringRotation >= Math.PI * 2) {
-            this.ringRotation -= Math.PI * 2; // Reset rotation after a full circle
+            this.ringRotation -= Math.PI * 2;
         }
 
-        // Draw curved ring pattern (filled with black)
         this.context.strokeStyle = 'black';
         this.context.fillStyle = 'black';
-        this.context.lineWidth = 5; // Increased from 3 to 5 for a thicker ring
+        this.context.lineWidth = 5;
 
-        const ringRadius = this.size / 2 + this.size / 6; // Increased from this.size / 8 to this.size / 6
+        const ringRadius = this.size / 2 + this.size / 6;
         const curveCount = 8;
         const curveAngle = (Math.PI * 2) / curveCount;
         const curveDepth = this.size / 4;
@@ -171,35 +164,28 @@ export class Player {
         this.context.fill();
         this.context.stroke();
 
-        // Draw player body (gray circle)
         this.context.fillStyle = 'gray';
         this.context.beginPath();
         this.context.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
         this.context.fill();
 
-        // Draw face
         const eyeWidth = this.size / 6;
         const eyeHeight = this.size / 4;
         const eyeY = this.y - eyeHeight / 2;
 
-        // Left eye
         this.context.fillStyle = 'white';
         this.context.fillRect(this.x - this.size / 6 - eyeWidth / 2, eyeY, eyeWidth, eyeHeight);
 
-        // Right eye
         this.context.fillRect(this.x + this.size / 6 - eyeWidth / 2, eyeY, eyeWidth, eyeHeight);
 
-        // Draw pupils (rectangular)
         this.context.fillStyle = 'black';
         const pupilWidth = eyeWidth * 0.6;
         const pupilHeight = eyeHeight * 0.6;
         const maxPupilOffset = (eyeWidth - pupilWidth) / 2;
 
-        // Calculate pupil offset based on movement direction
         const pupilOffsetX = this.movementDirection.x * maxPupilOffset;
         const pupilOffsetY = this.movementDirection.y * maxPupilOffset;
 
-        // Left pupil
         this.context.fillRect(
             this.x - this.size / 6 - pupilWidth / 2 + pupilOffsetX,
             eyeY + (eyeHeight - pupilHeight) / 2 + pupilOffsetY,
@@ -207,7 +193,6 @@ export class Player {
             pupilHeight
         );
 
-        // Right pupil
         this.context.fillRect(
             this.x + this.size / 6 - pupilWidth / 2 + pupilOffsetX,
             eyeY + (eyeHeight - pupilHeight) / 2 + pupilOffsetY,
@@ -215,28 +200,23 @@ export class Player {
             pupilHeight
         );
 
-        // Draw smile
         this.context.strokeStyle = 'black';
         this.context.lineWidth = 2;
         this.context.beginPath();
         this.context.arc(this.x, this.y + this.size / 8, this.size / 5, 0.2 * Math.PI, 0.8 * Math.PI);
         this.context.stroke();
 
-        // Draw combined health and shield bar
         const barWidth = this.size * 2;
         const barHeight = 5;
         const healthPercentage = this.health / 100;
         const shieldPercentage = this.shield / 100;
 
-        // Background (red)
         this.context.fillStyle = 'red';
         this.context.fillRect(this.x - barWidth / 2, this.y - this.size / 2 - 10, barWidth, barHeight);
 
-        // Health (green)
         this.context.fillStyle = 'green';
         this.context.fillRect(this.x - barWidth / 2, this.y - this.size / 2 - 10, barWidth * healthPercentage, barHeight);
 
-        // Shield (blue)
         this.context.fillStyle = 'blue';
         this.context.fillRect(
             this.x - barWidth / 2 + barWidth * healthPercentage, 
@@ -245,7 +225,6 @@ export class Player {
             barHeight
         );
 
-        // Draw regular score and gold score
         this.context.font = `${this.size / 3}px Arial`;
         this.context.textAlign = 'center';
         
@@ -255,7 +234,6 @@ export class Player {
         this.context.fillStyle = 'gold';
         this.context.fillText(`${this.goldScore}`, this.x + this.size / 2, this.y - this.size / 2 - 20);
 
-        // Draw XP bar (without level number)
         const xpPercentage = this.xp / this.xpToNextLevel;
 
         this.context.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -264,7 +242,6 @@ export class Player {
         this.context.fillStyle = 'yellow';
         this.context.fillRect(this.x - barWidth / 2, this.y - this.size / 2 - 25, barWidth * xpPercentage, barHeight);
 
-        // Draw emote if active
         if (this.currentEmote !== null) {
             this.drawEmote();
         }
@@ -309,13 +286,11 @@ export class Player {
 
     setSize(score: number) {
         const minSize = 20;
-        const growthFactor = 1.5; // Increased from 0.5 to 1.5 to allow for larger growth
-        const levelBonus = (this.level - 1) * 0.1; // 10% size increase per level
+        const growthFactor = 1.5;
+        const levelBonus = (this.level - 1) * 0.1;
 
-        // Calculate new size based on score and level
         const newSize = (minSize + Math.sqrt(score) * growthFactor) * (1 + levelBonus);
 
-        // Clamp the size between minSize and maxSize
         this.size = Math.max(minSize, Math.min(this.maxSize, newSize));
         
         console.log(`Player size updated. Score: ${score}, Level: ${this.level}, New size: ${this.size}`);
@@ -343,7 +318,7 @@ export class Player {
     public adjustScore(amount: number) {
         this.score += amount;
         this.setSize(this.score);
-        console.log(`Score adjusted. New score: ${this.score}`); // Add this line for debugging
+        console.log(`Score adjusted. New score: ${this.score}`);
     }
 
     public startDigging() {
@@ -372,7 +347,7 @@ export class Player {
 
     public adjustGoldScore(amount: number) {
         this.goldScore += amount;
-        this.saveGoldScore(); // Save the gold score after each adjustment
+        this.saveGoldScore();
         this.calculateLevelAndXP();
         console.log(`Gold score adjusted. New gold score: ${this.goldScore}`);
     }
@@ -401,14 +376,12 @@ export class Player {
     }
 
     private onLevelUp(): void {
-        // Increase max health and shield
         const maxHealth = 100 + (this.level - 1) * 10;
         const maxShield = 100 + (this.level - 1) * 5;
 
         this.health = Math.min(this.health, maxHealth);
         this.shield = Math.min(this.shield, maxShield);
 
-        // Increase base speed slightly
         this.baseSpeed = 4 + (this.level - 1) * 0.1;
     }
 
@@ -425,8 +398,10 @@ export class Player {
     }
 
     public displayEmote(emote: Emote) {
-        this.currentEmote = emote;
-        this.emoteDisplayTime = this.EMOTE_DURATION;
+        if (this.ownedEmotes.has(emote)) {
+            this.currentEmote = emote;
+            this.emoteDisplayTime = this.EMOTE_DURATION;
+        }
     }
 
     public updateEmote(deltaTime: number) {
@@ -439,46 +414,105 @@ export class Player {
     }
 
     private drawEmote() {
-        const emoteSize = this.size / 2;
-        const emoteY = this.y - this.size - emoteSize - 10;
+        if (this.currentEmote !== null) {
+            const emoteSize = this.size * 1.5;
+            const emoteX = this.x;
+            const emoteY = this.y - this.size * 1.5;
 
-        this.context.fillStyle = 'yellow';
-        this.context.beginPath();
-        this.context.arc(this.x, emoteY, emoteSize, 0, Math.PI * 2);
-        this.context.fill();
+            this.context.save();
+            this.context.setTransform(1, 0, 0, 1, 0, 0);
+            this.context.fillStyle = 'white';
+            this.context.font = `${emoteSize}px Arial`;
+            this.context.textAlign = 'center';
+            this.context.textBaseline = 'middle';
 
-        this.context.fillStyle = 'black';
-        this.context.font = `${emoteSize}px Arial`;
-        this.context.textAlign = 'center';
-        this.context.textBaseline = 'middle';
+            const emoteText = this.getEmoteText(this.currentEmote);
+            this.context.fillText(emoteText, emoteX, emoteY);
 
-        let emoteText = this.getEmoteText(this.currentEmote!);
-        this.context.fillText(emoteText, this.x, emoteY);
+            this.context.restore();
+        }
     }
 
     private getEmoteText(emote: Emote): string {
         switch (emote) {
-            case Emote.Happy: return '😊';
-            case Emote.Sad: return '😢';
-            case Emote.Angry: return '😠';
-            case Emote.Surprised: return '😮';
-            case Emote.Love: return '😍';
-            case Emote.Cool: return '😎';
-            case Emote.Thinking: return '🤔';
-            case Emote.Laughing: return '😂';
-            case Emote.Wink: return '😉';
-            case Emote.Confused: return '😕';
-            case Emote.Sleepy: return '😴';
-            case Emote.Excited: return '🤩';
-            case Emote.Nervous: return '😰';
-            case Emote.Sick: return '🤢';
-            case Emote.Rich: return '🤑';
-            case Emote.Strong: return '💪';
-            case Emote.Scared: return '😱';
-            case Emote.Crazy: return '🤪';
-            case Emote.Evil: return '😈';
-            case Emote.Dead: return '💀';
-            default: return '';
+            case Emote.Happy:
+                return ':)';
+            case Emote.Sad:
+                return ':(';
+            case Emote.Angry:
+                return '>:(';
+            case Emote.Surprised:
+                return ':O';
+            case Emote.Love:
+                return '<3';
+            case Emote.Cool:
+                return 'B)';
+            case Emote.Thinking:
+                return 'O.o';
+            case Emote.Laughing:
+                return ':D';
+            case Emote.Wink:
+                return ';)';
+            case Emote.Confused:
+                return ':/';
+            case Emote.Sleepy:
+                return ':Z';
+            case Emote.Excited:
+                return ':P';
+            case Emote.Nervous:
+                return ':|';
+            case Emote.Sick:
+                return ':X';
+            case Emote.Rich:
+                return ':$';
+            case Emote.Strong:
+                return ':@';
+            case Emote.Scared:
+                return ':!';
+            case Emote.Crazy:
+                return ':#';
+            case Emote.Evil:
+                return '>:)';
+            case Emote.Dead:
+                return 'x_x';
+            default:
+                return '';
+        }
+    }
+
+    public hasEmote(emote: Emote): boolean {
+        return this.ownedEmotes.has(emote);
+    }
+
+    public getOwnedEmotes(): Emote[] {
+        return Array.from(this.ownedEmotes);
+    }
+
+    public buyEmote(emote: Emote): boolean {
+        if (this.goldScore >= 300 && !this.ownedEmotes.has(emote)) {
+            this.goldScore -= 300;
+            this.ownedEmotes.add(emote);
+            this.saveGoldScore();
+            this.saveOwnedEmotes();
+            return true;
+        }
+        return false;
+    }
+
+    private saveOwnedEmotes(): void {
+        const ownedEmotesArray = Array.from(this.ownedEmotes);
+        localStorage.setItem('playerOwnedEmotes', JSON.stringify(ownedEmotesArray));
+    }
+
+    private loadOwnedEmotes(): void {
+        const savedEmotes = localStorage.getItem('playerOwnedEmotes');
+        if (savedEmotes) {
+            const emoteArray = JSON.parse(savedEmotes) as Emote[];
+            this.ownedEmotes = new Set(emoteArray);
+        } else {
+            // If no saved emotes, initialize with default emotes
+            this.ownedEmotes = new Set([Emote.Happy, Emote.Sad, Emote.Angry, Emote.Surprised]);
         }
     }
 }
+

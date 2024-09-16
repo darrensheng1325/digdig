@@ -1,6 +1,7 @@
 import { Player, Emote } from './player';
 import { Enemy } from './enemy';
 import { Terrain, Block } from './terrain';
+import { Shop } from './shop';
 
 export class Game {
     private canvas: HTMLCanvasElement;
@@ -23,6 +24,7 @@ export class Game {
     private isEmoteWheelOpen: boolean = false;
     private emoteWheelRadius: number = 100;
     private selectedEmote: Emote | null = null;
+    private shop: Shop;
 
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -36,6 +38,7 @@ export class Game {
         this.lastHealthRecoveryTime = Date.now();
         this.enemies = [];
         this.spawnEnemies(20); // Increased initial spawn from 15 to 20
+        this.shop = new Shop(this.player, this.context);
 
         this.init();
     }
@@ -60,6 +63,8 @@ export class Game {
     private handleKeyDown(event: KeyboardEvent) {
         if (event.key === 'e') {
             this.toggleEmoteWheel();
+        } else if (event.key === 's') {
+            this.shop.toggleShop();
         }
         this.keysPressed.add(event.key);
     }
@@ -91,7 +96,12 @@ export class Game {
     }
 
     private handleMouseDown(event: MouseEvent) {
-        if (this.isEmoteWheelOpen && this.selectedEmote !== null) {
+        if (this.shop.isShopOpen()) {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            this.shop.handleClick(x, y, this.canvas.width, this.canvas.height);
+        } else if (this.isEmoteWheelOpen && this.selectedEmote !== null) {
             this.player.displayEmote(this.selectedEmote);
             this.toggleEmoteWheel();
         } else if (this.isMouseControl) {
@@ -123,6 +133,10 @@ export class Game {
             case 'r': this.player.displayEmote(Emote.Sick); break;
             case 't': this.player.displayEmote(Emote.Rich); break;
             case 'y': this.player.displayEmote(Emote.Strong); break;
+            case 'u': this.player.displayEmote(Emote.Scared); break;
+            case 'i': this.player.displayEmote(Emote.Crazy); break;
+            case 'o': this.player.displayEmote(Emote.Evil); break;
+            case 'p': this.player.displayEmote(Emote.Dead); break;
         }
     }
 
@@ -297,7 +311,9 @@ export class Game {
         // Comment out or remove this line if you're not using drawScore anymore
         // this.drawScore();
 
-        if (this.isEmoteWheelOpen) {
+        if (this.shop.isShopOpen()) {
+            this.shop.render(this.canvas.width, this.canvas.height);
+        } else if (this.isEmoteWheelOpen) {
             this.renderEmoteWheel();
         }
     }
@@ -375,16 +391,18 @@ export class Game {
         this.context.fillStyle = 'rgba(0, 0, 0, 0.5)';
         this.context.fill();
 
-        for (let i = 0; i < emoteCount; i++) {
+        const ownedEmotes = this.player.getOwnedEmotes();
+        for (let i = 0; i < ownedEmotes.length; i++) {
+            const emote = ownedEmotes[i];
             const angle = i * angleStep;
             const x = centerX + Math.cos(angle) * this.emoteWheelRadius * 0.8;
             const y = centerY + Math.sin(angle) * this.emoteWheelRadius * 0.8;
 
             this.context.font = '20px Arial';
-            this.context.fillStyle = i === this.selectedEmote ? 'yellow' : 'white';
+            this.context.fillStyle = emote === this.selectedEmote ? 'yellow' : 'white';
             this.context.textAlign = 'center';
             this.context.textBaseline = 'middle';
-            this.context.fillText(this.getEmoteText(i as Emote), x, y);
+            this.context.fillText(this.getEmoteText(emote), x, y);
         }
 
         this.context.restore();

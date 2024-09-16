@@ -41,6 +41,10 @@ export class Enemy extends Player {
         }
     }
 
+    public updateEmote(deltaTime: number) {
+        super.updateEmote(deltaTime);
+    }
+
     private isOffScreen(screenWidth: number, screenHeight: number, cameraX: number, cameraY: number): boolean {
         return this.getX() < cameraX || this.getX() > cameraX + screenWidth ||
                this.getY() < cameraY || this.getY() > cameraY + screenHeight;
