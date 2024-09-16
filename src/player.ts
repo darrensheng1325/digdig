@@ -34,6 +34,9 @@ export class Player {
     private ownedEmotes: Set<Emote> = new Set([Emote.Happy, Emote.Sad, Emote.Angry, Emote.Surprised]);
     private isInAlternateDimension: boolean = false;
     private alternateDimensionScore: number = 0;
+    private normalSize: number;
+    private alternateDimensionSize: number = 30; // Increased from 20 to 30
+    private alternateDimensionSpeedMultiplier: number = 0.5; // 50% slower in alternate dimension
 
     constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D, terrain: Terrain) {
         this.x = x;
@@ -46,6 +49,7 @@ export class Player {
         this.loadGoldScore();
         this.loadOwnedEmotes();
         this.calculateLevelAndXP();
+        this.normalSize = this.size;
     }
 
     move(dx: number, dy: number) {
@@ -69,9 +73,16 @@ export class Player {
         const minSize = 20;
         const normalizedSize = Math.min((this.size - minSize) / (this.maxSize - minSize), 1);
         const speedDecrease = normalizedSize * 0.95;
-        const baseSpeed = Math.max(this.minSpeed, this.baseSpeed - this.baseSpeed * speedDecrease);
+        let baseSpeed = Math.max(this.minSpeed, this.baseSpeed - this.baseSpeed * speedDecrease);
         
-        return baseSpeed * (1 + (this.level - 1) * 0.05);
+        baseSpeed *= (1 + (this.level - 1) * 0.05);
+
+        // Apply speed reduction in alternate dimension
+        if (this.isInAlternateDimension) {
+            baseSpeed *= this.alternateDimensionSpeedMultiplier;
+        }
+
+        return baseSpeed;
     }
 
     dig(terrain: Terrain) {
@@ -281,6 +292,8 @@ export class Player {
         if (amount > 0) {
             this.health = Math.max(0, this.health - amount);
         }
+
+        console.log(`Player health: ${this.health}, Shield: ${this.shield}`);
     }
 
     adjustShield(amount: number) {
@@ -291,20 +304,21 @@ export class Player {
         this.health = Math.min(100, this.health + amount);
     }
 
-    setSize(score: number) {
-        const minSize = 20;
-        const growthFactor = 1.5;
-        const levelBonus = (this.level - 1) * 0.1;
+    public setSize(score: number) {
+        if (!this.isInAlternateDimension) {
+            const minSize = 20;
+            const growthFactor = 1.5;
+            const levelBonus = (this.level - 1) * 0.1;
 
-        const newSize = (minSize + Math.sqrt(score) * growthFactor) * (1 + levelBonus);
+            const newSize = (minSize + Math.sqrt(score) * growthFactor) * (1 + levelBonus);
 
-        this.size = Math.max(minSize, Math.min(this.maxSize, newSize));
-        
-        console.log(`Player size updated. Score: ${score}, Level: ${this.level}, New size: ${this.size}`);
+            this.size = Math.max(minSize, Math.min(this.maxSize, newSize));
+            this.normalSize = this.size;
+        }
     }
 
     public getSize(): number {
-        return this.size;
+        return this.isInAlternateDimension ? this.alternateDimensionSize : this.size;
     }
 
     public getContext(): CanvasRenderingContext2D {
@@ -529,6 +543,12 @@ export class Player {
 
     public setInAlternateDimension(value: boolean) {
         this.isInAlternateDimension = value;
+        if (value) {
+            this.normalSize = this.size; // Store the current size
+            this.size = this.alternateDimensionSize; // Set to slightly larger size
+        } else {
+            this.size = this.normalSize; // Restore the normal size
+        }
     }
 
     public adjustAlternateDimensionScore(amount: number) {
@@ -541,6 +561,10 @@ export class Player {
 
     public getAlternateDimensionScore(): number {
         return this.alternateDimensionScore;
+    }
+
+    public isDead(): boolean {
+        return this.health <= 0;
     }
 }
 

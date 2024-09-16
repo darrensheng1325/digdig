@@ -3,6 +3,7 @@ import { Enemy } from './enemy';
 import { Terrain, Block } from './terrain';
 import { Shop } from './shop';
 import { AlternateDimension } from './alternateDimension';
+import { TitleScreen } from './titleScreen'; // Make sure to import TitleScreen
 
 export class Game {
     private canvas: HTMLCanvasElement;
@@ -30,8 +31,11 @@ export class Game {
     private isInAlternateDimension: boolean = false;
     private portalCooldown: number = 0;
     private readonly PORTAL_COOLDOWN_DURATION: number = 5000; // 5 seconds cooldown
+    private titleScreen: TitleScreen;
+    private isGameOver: boolean = false;
+    private gameOverMessage: string = '';
 
-    constructor(canvasId: string) {
+    constructor(canvasId: string, titleScreen: TitleScreen) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         this.context = this.canvas.getContext('2d')!;
         this.terrain = new Terrain(10000, 10000); // Increased terrain size to 10000x10000
@@ -62,6 +66,7 @@ export class Game {
         this.spawnEnemies(20); // Increased initial spawn from 15 to 20
         this.shop = new Shop(this.player, this.context);
         this.alternateDimension = new AlternateDimension(10000, 10000, this.context);
+        this.titleScreen = titleScreen;
 
         this.init();
     }
@@ -164,16 +169,18 @@ export class Game {
     }
 
     private gameLoop() {
-        this.update();
-        this.render();
-        requestAnimationFrame(() => this.gameLoop());
-    }
-
-    private update() {
         const currentTime = Date.now();
         const deltaTime = currentTime - this.lastUpdateTime;
         this.lastUpdateTime = currentTime;
 
+        if (!this.isGameOver) {
+            this.update(deltaTime);
+        }
+        this.render();
+        requestAnimationFrame(() => this.gameLoop());
+    }
+
+    private update(deltaTime: number) {
         if (!this.isMouseControl) {
             // Existing keyboard control logic
             let dx = 0;
@@ -197,9 +204,9 @@ export class Game {
         console.log(`Player position: (${this.player.getX()}, ${this.player.getY()}), Digging: ${this.player.isDigging()}`);
 
         // Health recovery over time (shield does not recover)
-        if (currentTime - this.lastHealthRecoveryTime > 500) { // Recover health every 0.5 seconds
+        if (Date.now() - this.lastHealthRecoveryTime > 500) { // Recover health every 0.5 seconds
             this.player.recoverHealth(2); // Recover 2 health points
-            this.lastHealthRecoveryTime = currentTime;
+            this.lastHealthRecoveryTime = Date.now();
         }
 
         // Update zoom based on player size
@@ -222,18 +229,18 @@ export class Game {
             
             if (distance < (this.player.getSize() + enemy.getSize()) / 2) {
                 // Collision detected
+                const damage = Math.floor(enemy.getSize() * 0.5); // 50% of enemy size as damage
+                this.player.takeDamage(damage);
+                console.log(`Player took ${damage} damage from enemy`);
+
                 if (this.player.getSize() > enemy.getSize()) {
-                    // Player wins
+                    // Player is larger, consume the enemy
                     const scoreIncrease = Math.floor(enemy.getSize());
                     this.player.adjustScore(scoreIncrease);
-                    console.log(`Player defeated enemy. Score increase: ${scoreIncrease}`); // Add this line for debugging
+                    console.log(`Player defeated enemy. Score increase: ${scoreIncrease}`);
                     this.enemies.splice(index, 1);
                 } else {
-                    // Enemy wins
-                    const damage = Math.floor(enemy.getSize() / 10); // Calculate damage based on enemy size
-                    this.player.takeDamage(damage); // Use takeDamage instead of adjustHealth
-                    
-                    // Optional: Make the enemy bounce away after dealing damage
+                    // Enemy is larger or equal, bounce away
                     const bounceDistance = 20;
                     const bounceX = enemy.getX() + (dx / distance) * bounceDistance;
                     const bounceY = enemy.getY() + (dy / distance) * bounceDistance;
@@ -291,6 +298,12 @@ export class Game {
                 this.player.dig(this.terrain);
             }
         }
+
+        // Check if player is dead
+        if (this.player.isDead() && !this.isGameOver) {
+            this.handlePlayerDeath();
+            return; // Exit the update method early
+        }
     }
 
     private updateZoom() {
@@ -310,26 +323,6 @@ export class Game {
         
         // Clamp zoom between minZoom and maxZoom
         this.zoom = Math.max(this.minZoom, Math.min(this.maxZoom, this.zoom));
-    }
-
-    private checkCollisions() {
-        this.enemies.forEach((enemy, index) => {
-            const dx = this.player.getX() - enemy.getX();
-            const dy = this.player.getY() - enemy.getY();
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance < (this.player.getSize() + enemy.getSize()) / 2) {
-                // Collision detected
-                if (this.player.getSize() > enemy.getSize()) {
-                    // Player wins
-                    this.score += Math.floor(enemy.getSize());
-                    this.enemies.splice(index, 1);
-                } else {
-                    // Enemy wins
-                    this.player.adjustHealth(-10);
-                }
-            }
-        });
     }
 
     private render() {
@@ -373,9 +366,6 @@ export class Game {
         
         this.context.restore();
 
-        // Comment out or remove this line if you're not using drawScore anymore
-        // this.drawScore();
-
         if (this.shop.isShopOpen()) {
             this.shop.render(this.canvas.width, this.canvas.height);
         } else if (this.isEmoteWheelOpen) {
@@ -385,6 +375,10 @@ export class Game {
         // Render portal cooldown indicator
         if (this.portalCooldown > 0) {
             this.renderPortalCooldown();
+        }
+
+        if (this.isGameOver) {
+            this.renderGameOverMessage();
         }
     }
 
@@ -400,14 +394,6 @@ export class Game {
             enemyY >= playerY - visibleHeight / 2 &&
             enemyY <= playerY + visibleHeight / 2
         );
-    }
-
-    private drawScore() {
-        this.context.fillStyle = 'white';
-        this.context.font = '20px Arial';
-        // Remove the score display
-        // this.context.fillText(`Score: ${this.player.getScore()}`, 10, 30);
-        this.context.fillText(`Zoom: ${this.zoom.toFixed(2)}`, 10, 30);
     }
 
     private spawnEnemies(count: number) {
@@ -511,16 +497,32 @@ export class Game {
             if (this.isInAlternateDimension) {
                 console.log("Entered alternate dimension");
                 const alternateDimensionPortal = this.alternateDimension!.getPortalLocation();
-                this.player.setPosition(alternateDimensionPortal.x, alternateDimensionPortal.y);
+                // Add a small random offset to avoid spawning directly on the portal
+                const offsetX = (Math.random() - 0.5) * 50;
+                const offsetY = (Math.random() - 0.5) * 50;
+                this.player.setPosition(alternateDimensionPortal.x + offsetX, alternateDimensionPortal.y + offsetY);
             } else {
                 console.log("Returned to normal dimension");
                 const normalDimensionPortal = this.terrain.getPortalLocation();
-                this.player.setPosition(normalDimensionPortal.x, normalDimensionPortal.y);
+                // Add a small random offset to avoid spawning directly on the portal
+                const offsetX = (Math.random() - 0.5) * 50;
+                const offsetY = (Math.random() - 0.5) * 50;
+                this.player.setPosition(normalDimensionPortal.x + offsetX, normalDimensionPortal.y + offsetY);
             }
             this.portalCooldown = this.PORTAL_COOLDOWN_DURATION;
+            
+            // Force an update of the camera position
+            this.updateCameraPosition();
         } else {
             console.log("Portal on cooldown. Time remaining:", this.portalCooldown / 1000, "seconds");
         }
+    }
+
+    private updateCameraPosition() {
+        const effectiveWidth = this.canvas.width / this.zoom;
+        const effectiveHeight = this.canvas.height / this.zoom;
+        this.cameraX = Math.max(0, Math.min(this.terrain.getWidth() - effectiveWidth, this.player.getX() - effectiveWidth / 2));
+        this.cameraY = Math.max(0, Math.min(this.terrain.getHeight() - effectiveHeight, this.player.getY() - effectiveHeight / 2));
     }
 
     private renderPortalCooldown() {
@@ -544,5 +546,36 @@ export class Game {
         this.context.textAlign = 'center';
         this.context.textBaseline = 'middle';
         this.context.fillText('Portal Cooldown', x + barWidth / 2, y + barHeight / 2);
+    }
+
+    private handlePlayerDeath() {
+        console.log("Player has died!");
+        this.isGameOver = true;
+        this.gameOverMessage = "Game Over! You have died.";
+
+        // Render the game over message immediately
+        this.render();
+
+        // Reload the page after 1 second
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
+    }
+
+    private renderGameOverMessage() {
+        const ctx = this.context;
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        ctx.font = '48px Arial';
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.gameOverMessage, this.canvas.width / 2, this.canvas.height / 2);
+
+        ctx.font = '24px Arial';
+        ctx.fillText('Reloading...', this.canvas.width / 2, this.canvas.height / 2 + 50);
+        ctx.restore();
     }
 }

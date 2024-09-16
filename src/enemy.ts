@@ -8,9 +8,9 @@ export class Enemy extends Player {
     private goldDetectionRadius: number = 100; // Radius to detect gold
 
     constructor(x: number, y: number, terrainWidth: number, terrainHeight: number, context: CanvasRenderingContext2D, target: Player, terrain: Terrain) {
-        super(x, y, 50, 5, context, terrain);
+        super(x, y, 100, 5, context, terrain); // Increased initial health to 100
         this.target = target;
-        this.setSize(20); // Set initial size
+        this.setSize(300); // Increased initial size
     }
 
     // Change protected to public
@@ -118,11 +118,11 @@ export class Enemy extends Player {
 
     protected handleDugBlock(block: Block) {
         if (block.type === 'uranium') {
-            this.takeDamage(5);
+            this.takeDamage(2); // Reduced damage from uranium
         } else if (block.type === 'lava') {
-            this.takeDamage(20);
+            this.takeDamage(10); // Reduced damage from lava
         } else if (block.type === 'quartz') {
-            this.adjustShield(10);
+            this.adjustShield(5);
         } else if (block.type === 'gold_ore') {
             this.adjustGoldScore(1);
         } else {
@@ -132,7 +132,7 @@ export class Enemy extends Player {
     }
 
     private updateSize() {
-        const growthRate = 0.03; // Increased growth rate (twice as fast as the player)
+        const growthRate = 0.05; // Increased growth rate
         const newSize = this.getSize() + (this.getScore() + this.getGoldScore()) * growthRate;
         this.setSize(newSize);
     }

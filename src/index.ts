@@ -41,7 +41,7 @@ class GameManager {
     }
 
     private startGame() {
-        this.game = new Game('gameCanvas');
+        this.game = new Game('gameCanvas', this.titleScreen);
         this.setupFullscreenButton();
         this.setupControlToggleButton();
         this.controlToggleButton.style.display = 'block';
