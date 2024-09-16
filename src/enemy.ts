@@ -108,9 +108,9 @@ export class Enemy extends Player {
 
     protected handleDugBlock(block: Block) {
         if (block.type === 'uranium') {
-            this.adjustScore(-5);
+            this.takeDamage(5);
         } else if (block.type === 'lava') {
-            this.adjustHealth(-20);
+            this.takeDamage(20);
         } else if (block.type === 'quartz') {
             this.adjustShield(10);
         } else if (block.type === 'gold_ore') {

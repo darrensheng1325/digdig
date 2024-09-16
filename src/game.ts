@@ -117,7 +117,7 @@ export class Game {
         // Log player's position and digging status for debugging
         console.log(`Player position: (${this.player.getX()}, ${this.player.getY()}), Digging: ${this.player.isDigging()}`);
 
-        // Health recovery over time
+        // Health recovery over time (shield does not recover)
         const currentTime = Date.now();
         if (currentTime - this.lastHealthRecoveryTime > 500) { // Recover health every 0.5 seconds
             this.player.recoverHealth(2); // Recover 2 health points
@@ -153,7 +153,7 @@ export class Game {
                 } else {
                     // Enemy wins
                     const damage = Math.floor(enemy.getSize() / 10); // Calculate damage based on enemy size
-                    this.player.adjustHealth(-damage); // Deal damage to player
+                    this.player.takeDamage(damage); // Use takeDamage instead of adjustHealth
                     
                     // Optional: Make the enemy bounce away after dealing damage
                     const bounceDistance = 20;
@@ -247,7 +247,8 @@ export class Game {
         
         this.context.restore();
 
-        this.drawScore();
+        // Comment out or remove this line if you're not using drawScore anymore
+        // this.drawScore();
     }
 
     private isEnemyVisible(enemy: Enemy, visibleWidth: number, visibleHeight: number): boolean {
@@ -267,8 +268,9 @@ export class Game {
     private drawScore() {
         this.context.fillStyle = 'white';
         this.context.font = '20px Arial';
-        this.context.fillText(`Score: ${this.player.getScore()}`, 10, 30);
-        this.context.fillText(`Zoom: ${this.zoom.toFixed(2)}`, 10, 60);
+        // Remove the score display
+        // this.context.fillText(`Score: ${this.player.getScore()}`, 10, 30);
+        this.context.fillText(`Zoom: ${this.zoom.toFixed(2)}`, 10, 30);
     }
 
     private spawnEnemies(count: number) {

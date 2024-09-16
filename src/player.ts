@@ -113,11 +113,14 @@ export class Player {
 
     draw(screenWidth: number, screenHeight: number) {
         // Draw level in the top left corner
+        this.context.save();
+        this.context.setTransform(1, 0, 0, 1, 0, 0); // Reset the transformation
         this.context.fillStyle = 'white';
         this.context.font = '24px Arial';
         this.context.textAlign = 'left';
         this.context.textBaseline = 'top';
         this.context.fillText(`Level: ${this.level}`, 10, 10);
+        this.context.restore();
 
         this.updateRingRotation();
         // Update ring rotation
@@ -242,7 +245,7 @@ export class Player {
         this.context.fillStyle = 'gold';
         this.context.fillText(`${this.goldScore}`, this.x + this.size / 2, this.y - this.size / 2 - 20);
 
-        // Draw level and XP bar
+        // Draw XP bar (without level number)
         const xpPercentage = this.xp / this.xpToNextLevel;
 
         this.context.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -250,11 +253,6 @@ export class Player {
 
         this.context.fillStyle = 'yellow';
         this.context.fillRect(this.x - barWidth / 2, this.y - this.size / 2 - 25, barWidth * xpPercentage, barHeight);
-
-        this.context.fillStyle = 'white';
-        this.context.font = `${this.size / 4}px Arial`;
-        this.context.textAlign = 'center';
-        this.context.fillText(`Lvl ${this.level}`, this.x, this.y - this.size / 2 - 30);
     }
 
     getX() { return this.x; }
@@ -263,14 +261,34 @@ export class Player {
     getShield() { return this.shield; }
 
     adjustHealth(amount: number) {
-        this.health = Math.max(0, Math.min(100, this.health + amount));
+        if (amount < 0) {
+            this.takeDamage(-amount);
+        } else {
+            this.health = Math.min(100, this.health + amount);
+        }
+    }
+
+    public takeDamage(amount: number) {
+        if (this.shield > 0) {
+            if (this.shield >= amount) {
+                this.shield -= amount;
+                amount = 0;
+            } else {
+                amount -= this.shield;
+                this.shield = 0;
+            }
+        }
+
+        if (amount > 0) {
+            this.health = Math.max(0, this.health - amount);
+        }
     }
 
     adjustShield(amount: number) {
         this.shield = Math.max(0, Math.min(100, this.shield + amount));
     }
 
-    recoverHealth(amount: number) {
+    public recoverHealth(amount: number) {
         this.health = Math.min(100, this.health + amount);
     }
 
