@@ -46,12 +46,15 @@ export class Game {
         // Set a minimum spawn distance from the portal
         const minSpawnDistance = 1000; // Adjust this value as needed
         
-        // Generate a random spawn point that's at least minSpawnDistance away from the portal
+        // Generate a random spawn point in the dirt biome
         let spawnX, spawnY;
         do {
-            spawnX = Math.random() * this.terrain.getWidth();
-            spawnY = Math.random() * this.terrain.getHeight();
-        } while (this.distanceBetween(spawnX, spawnY, portalLocation.x, portalLocation.y) < minSpawnDistance);
+            spawnX = Math.random() * this.terrain.getOriginalWidth();
+            spawnY = Math.random() * this.terrain.getOriginalHeight();
+        } while (
+            this.distanceBetween(spawnX, spawnY, portalLocation.x, portalLocation.y) < minSpawnDistance ||
+            this.terrain.getBlock(spawnX, spawnY)?.type !== 'dirt'
+        );
         
         // Create the player at the spawn location
         this.player = new Player(

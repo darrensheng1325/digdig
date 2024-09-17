@@ -58,14 +58,16 @@ export class Player {
         const newY = this.y + dy * speed;
 
         if (newX >= 0 && newX < this.terrain.getWidth() && newY >= 0 && newY < this.terrain.getHeight()) {
-            this.x = newX;
-            this.y = newY;
-            const length = Math.sqrt(dx * dx + dy * dy);
-            if (length > 0) {
-                this.movementDirection = { x: dx / length, y: dy / length };
+            if (!this.terrain.checkCollision(newX, newY, this.size)) {
+                this.x = newX;
+                this.y = newY;
+                const length = Math.sqrt(dx * dx + dy * dy);
+                if (length > 0) {
+                    this.movementDirection = { x: dx / length, y: dy / length };
+                }
+                
+                this.dig(this.terrain);
             }
-            
-            this.dig(this.terrain);
         }
     }
 
