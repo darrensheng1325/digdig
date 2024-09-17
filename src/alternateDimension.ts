@@ -20,7 +20,8 @@ export class AlternateDimension {
     private context: CanvasRenderingContext2D;
     private portalLocation: { x: number, y: number };
     private dots: AlternateDimensionDot[];
-    private dotRadius: number = 6; // Increased dot size
+    private dotRadius: number = 25; // Same size as the portal
+    private portalRadius: number = 25; // Explicitly define portal radius
     private walls: Wall[];
 
     constructor(width: number, height: number, context: CanvasRenderingContext2D) {
@@ -34,26 +35,44 @@ export class AlternateDimension {
 
     private generateDots(): AlternateDimensionDot[] {
         const dots: AlternateDimensionDot[] = [];
-        const dotCount = 3000; // Increased dot count for the larger, more complex map
-        while (dots.length < dotCount) {
+        const dotCount = 1000; // Reduced dot count due to larger size
+        let attempts = 0;
+        const maxAttempts = 10000; // Prevent infinite loop
+
+        while (dots.length < dotCount && attempts < maxAttempts) {
             const x = Math.random() * this.width;
             const y = Math.random() * this.height;
-            if (!this.isInsideWall(x, y)) {
+            if (!this.isInsideWall(x, y) && !this.isOverlappingDots(x, y, dots) && !this.isOverlappingPortal(x, y)) {
                 dots.push({
                     x: x,
                     y: y,
                     present: true
                 });
             }
+            attempts++;
         }
         return dots;
     }
 
     private isInsideWall(x: number, y: number): boolean {
         return this.walls.some(wall => 
-            x >= wall.x && x <= wall.x + wall.width &&
-            y >= wall.y && y <= wall.y + wall.height
+            x - this.dotRadius < wall.x + wall.width &&
+            x + this.dotRadius > wall.x &&
+            y - this.dotRadius < wall.y + wall.height &&
+            y + this.dotRadius > wall.y
         );
+    }
+
+    private isOverlappingDots(x: number, y: number, dots: AlternateDimensionDot[]): boolean {
+        return dots.some(dot => 
+            Math.sqrt(Math.pow(x - dot.x, 2) + Math.pow(y - dot.y, 2)) < (this.dotRadius * 2)
+        );
+    }
+
+    private isOverlappingPortal(x: number, y: number): boolean {
+        const dx = x - this.portalLocation.x;
+        const dy = y - this.portalLocation.y;
+        return Math.sqrt(dx * dx + dy * dy) < (this.dotRadius + this.portalRadius);
     }
 
     private createFixedMap(): Wall[] {
@@ -185,7 +204,6 @@ export class AlternateDimension {
     }
 
     private findSafePortalLocation(): { x: number, y: number } {
-        const portalRadius = 25; // Half the size of the portal
         let x: number = 0;
         let y: number = 0;
         let isSafe = false;
@@ -195,11 +213,13 @@ export class AlternateDimension {
             y = Math.random() * this.height;
 
             isSafe = !this.walls.some(wall => 
-                x - portalRadius < wall.x + wall.width &&
-                x + portalRadius > wall.x &&
-                y - portalRadius < wall.y + wall.height &&
-                y + portalRadius > wall.y
+                x - this.portalRadius < wall.x + wall.width &&
+                x + this.portalRadius > wall.x &&
+                y - this.portalRadius < wall.y + wall.height &&
+                y + this.portalRadius > wall.y
             );
+
+            // Remove the check for dots collision here, as dots are not generated yet
         }
 
         return { x, y };
@@ -207,12 +227,13 @@ export class AlternateDimension {
 
     public update(player: Player, enemies: Enemy[]) {
         // Check if player is digging any dots
-        const digRadius = player.getSize() / 2;
+        const playerRadius = player.getSize() / 2;
         this.dots.forEach(dot => {
             if (dot.present) {
                 const dx = player.getX() - dot.x;
                 const dy = player.getY() - dot.y;
-                if (dx * dx + dy * dy <= digRadius * digRadius) {
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance <= playerRadius + this.dotRadius) {
                     dot.present = false;
                     player.adjustAlternateDimensionScore(10); // Give 10 points for each dot
                 }
@@ -283,7 +304,7 @@ export class AlternateDimension {
         this.dots.forEach(dot => {
             if (dot.present) {
                 context.beginPath();
-                context.arc(dot.x, dot.y, this.dotRadius, 0, Math.PI * 2); // Using dotRadius here
+                context.arc(dot.x, dot.y, this.dotRadius, 0, Math.PI * 2);
                 context.fill();
             }
         });
@@ -291,7 +312,7 @@ export class AlternateDimension {
         // Draw the portal back to the normal dimension (green)
         context.fillStyle = '#00FF00'; // Bright green color
         context.beginPath();
-        context.arc(this.portalLocation.x, this.portalLocation.y, 25, 0, Math.PI * 2);
+        context.arc(this.portalLocation.x, this.portalLocation.y, this.portalRadius, 0, Math.PI * 2);
         context.fill();
     }
 

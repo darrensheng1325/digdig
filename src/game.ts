@@ -115,15 +115,21 @@ export class Game {
             this.selectedEmote = this.getEmoteFromPosition(x, y);
         } else if (this.isMouseControl) {
             const rect = this.canvas.getBoundingClientRect();
-            const x = event.clientX - rect.left + this.cameraX;
-            const y = event.clientY - rect.top + this.cameraY;
-            const dx = x - this.player.getX();
-            const dy = y - this.player.getY();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+
+            // Convert mouse position to world coordinates
+            const worldX = (mouseX / this.zoom) + this.cameraX;
+            const worldY = (mouseY / this.zoom) + this.cameraY;
+
+            const dx = worldX - this.player.getX();
+            const dy = worldY - this.player.getY();
             const distance = Math.sqrt(dx * dx + dy * dy);
+
             if (distance > 5) {  // Add a small threshold to prevent jittering
-                const speed = this.player.getSpeed();
-                const moveX = (dx / distance) * speed;
-                const moveY = (dy / distance) * speed;
+                const angle = Math.atan2(dy, dx);
+                const moveX = Math.cos(angle);
+                const moveY = Math.sin(angle);
                 this.player.move(moveX, moveY);
             }
         }
@@ -421,6 +427,7 @@ export class Game {
         if (this.isMouseControl) {
             this.keysPressed.clear();  // Clear any pressed keys when switching to mouse control
         }
+        console.log(`Mouse control is now ${this.isMouseControl ? 'enabled' : 'disabled'}`);
     }
 
     private toggleEmoteWheel() {

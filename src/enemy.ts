@@ -8,9 +8,9 @@ export class Enemy extends Player {
     private goldDetectionRadius: number = 100; // Radius to detect gold
 
     constructor(x: number, y: number, terrainWidth: number, terrainHeight: number, context: CanvasRenderingContext2D, target: Player, terrain: Terrain) {
-        super(x, y, 100, 5, context, terrain); // Increased initial health to 100
+        super(x, y, 100, 5, context, terrain);
         this.target = target;
-        this.setSize(300); // Increased initial size
+        this.setSize(30); // Start with a smaller size
     }
 
     // Change protected to public
@@ -117,24 +117,45 @@ export class Enemy extends Player {
     }
 
     protected handleDugBlock(block: Block) {
-        if (block.type === 'uranium') {
-            this.takeDamage(2); // Reduced damage from uranium
-        } else if (block.type === 'lava') {
-            this.takeDamage(10); // Reduced damage from lava
-        } else if (block.type === 'quartz') {
-            this.adjustShield(5);
-        } else if (block.type === 'gold_ore') {
-            this.adjustGoldScore(1);
-        } else {
-            this.adjustScore(1);
+        switch (block.type) {
+            case 'uranium':
+                this.adjustHealth(-2); // Reduced damage from uranium
+                break;
+            case 'lava':
+                this.adjustHealth(-10); // Reduced damage from lava
+                break;
+            case 'quartz':
+                this.adjustShield(5);
+                break;
+            case 'bedrock':
+                this.adjustScore(5);
+                break;
+            case 'gold_ore':
+                this.adjustGoldScore(1);
+                break;
+            default:
+                this.adjustScore(1);
         }
         this.updateSize();
     }
 
     private updateSize() {
-        const growthRate = 0.05; // Increased growth rate
-        const newSize = this.getSize() + (this.getScore() + this.getGoldScore()) * growthRate;
-        this.setSize(newSize);
+        this.setSize(this.getScore() + this.getGoldScore());
+    }
+
+    public setSize(score: number) {
+        const minSize = 20;
+        const growthFactor = 1.5;
+        const levelBonus = (this.getLevel() - 1) * 0.1;
+
+        const newSize = (minSize + Math.sqrt(score) * growthFactor) * (1 + levelBonus);
+
+        super.setSize(Math.max(minSize, Math.min(1000, newSize))); // Use 1000 as max size
+    }
+
+    // Override the getLevel method to provide a level for the enemy
+    public getLevel(): number {
+        return Math.floor(Math.sqrt(this.getScore() / 100)) + 1;
     }
 
     public setPosition(x: number, y: number) {
