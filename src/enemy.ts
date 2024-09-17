@@ -85,12 +85,7 @@ export class Enemy extends Player {
             const speed = this.getSpeed();
             const moveX = (dx / distance) * speed;
             const moveY = (dy / distance) * speed;
-            const newX = this.getX() + moveX;
-            const newY = this.getY() + moveY;
-            
-            if (!terrain.checkCollision(newX, newY, this.getSize())) {
-                this.move(moveX, moveY);
-            }
+            this.move(moveX, moveY);
         }
     }
 
