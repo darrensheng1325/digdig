@@ -2,8 +2,9 @@ import { Player, Emote } from './player';
 import { Enemy } from './enemy';
 import { Terrain, Block } from './terrain';
 import { Shop } from './shop';
-import { AlternateDimension } from './alternateDimension';
-import { TitleScreen } from './titleScreen'; // Make sure to import TitleScreen
+import { AlternateDimension, DimensionType } from './alternateDimension';
+import { TitleScreen } from './titleScreen';
+import { CloudMob } from './cloudMob';
 
 export class Game {
     private canvas: HTMLCanvasElement;
@@ -16,44 +17,50 @@ export class Game {
     private cameraY: number;
     private lastHealthRecoveryTime: number;
     private enemies: Enemy[] = [];
-    private maxEnemies: number = 40; // Changed from 20 to 40
+    private maxEnemies: number = 40;
     private isMouseControl: boolean = false;
     private zoom: number = 1;
-    private minZoom: number = 0.01; // Minimum zoom (maximum zoom out)
-    private maxZoom: number = 1; // Maximum zoom (no zoom out)
-    private zoomCap: number = 0.4; // Set the zoom cap to 40%
+    private minZoom: number = 0.01;
+    private maxZoom: number = 1;
+    private zoomCap: number = 0.4;
     private lastUpdateTime: number = 0;
     private isEmoteWheelOpen: boolean = false;
     private emoteWheelRadius: number = 100;
     private selectedEmote: Emote | null = null;
     private shop: Shop;
     private alternateDimension: AlternateDimension | null = null;
-    private isInAlternateDimension: boolean = false;
+    private grassDimension: AlternateDimension | null = null;
+    private currentDimension: 'normal' | 'alternate' | 'grass' = 'normal';
     private portalCooldown: number = 0;
-    private readonly PORTAL_COOLDOWN_DURATION: number = 5000; // 5 seconds cooldown
+    private readonly PORTAL_COOLDOWN_DURATION: number = 5000;
     private titleScreen: TitleScreen;
     private isGameOver: boolean = false;
     private gameOverMessage: string = '';
+    private cloudMobs: CloudMob[] = [];
+    private maxCloudMobs: number = 20;
 
     constructor(canvasId: string, titleScreen: TitleScreen) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         this.context = this.canvas.getContext('2d')!;
-        this.terrain = new Terrain(10000, 10000); // Increased terrain size to 10000x10000
+        this.terrain = new Terrain(10000, 10000);
         
-        // Get the portal location
         const portalLocation = this.terrain.getPortalLocation();
         
-        // Set a minimum spawn distance from the portal
-        const minSpawnDistance = 1000; // Adjust this value as needed
+        // Reduced spawn distance from the portal for easier debugging
+        const minSpawnDistance = 100; // Changed from 1000 to 100
+        const maxSpawnDistance = 200; // Added max spawn distance
         
-        // Generate a random spawn point that's at least minSpawnDistance away from the portal
         let spawnX, spawnY;
         do {
-            spawnX = Math.random() * this.terrain.getWidth();
-            spawnY = Math.random() * this.terrain.getHeight();
-        } while (this.distanceBetween(spawnX, spawnY, portalLocation.x, portalLocation.y) < minSpawnDistance);
+            const angle = Math.random() * 2 * Math.PI;
+            const distance = minSpawnDistance + Math.random() * (maxSpawnDistance - minSpawnDistance);
+            spawnX = portalLocation.x + Math.cos(angle) * distance;
+            spawnY = portalLocation.y + Math.sin(angle) * distance;
+        } while (
+            spawnX < 0 || spawnX >= this.terrain.getWidth() ||
+            spawnY < 0 || spawnY >= this.terrain.getHeight()
+        );
         
-        // Create the player at the spawn location
         this.player = new Player(
             spawnX,
             spawnY,
@@ -69,9 +76,10 @@ export class Game {
         this.cameraY = 0;
         this.lastHealthRecoveryTime = Date.now();
         this.enemies = [];
-        this.spawnEnemies(20); // Increased initial spawn from 15 to 20
+        this.spawnEnemies(20);
         this.shop = new Shop(this.player, this.context);
-        this.alternateDimension = new AlternateDimension(10000, 10000, this.context);
+        this.alternateDimension = new AlternateDimension(10000, 10000, this.context, DimensionType.Dark);
+        this.grassDimension = new AlternateDimension(10000, 10000, this.context, DimensionType.Grass);
         this.titleScreen = titleScreen;
 
         this.init();
@@ -118,7 +126,6 @@ export class Game {
             const mouseX = event.clientX - rect.left;
             const mouseY = event.clientY - rect.top;
 
-            // Convert mouse position to world coordinates
             const worldX = (mouseX / this.zoom) + this.cameraX;
             const worldY = (mouseY / this.zoom) + this.cameraY;
 
@@ -126,7 +133,7 @@ export class Game {
             const dy = worldY - this.player.getY();
             const distance = Math.sqrt(dx * dx + dy * dy);
 
-            if (distance > 5) {  // Add a small threshold to prevent jittering
+            if (distance > 5) {
                 const angle = Math.atan2(dy, dx);
                 const moveX = Math.cos(angle);
                 const moveY = Math.sin(angle);
@@ -194,7 +201,6 @@ export class Game {
 
     private update(deltaTime: number) {
         if (!this.isMouseControl) {
-            // Existing keyboard control logic
             let dx = 0;
             let dy = 0;
 
@@ -209,71 +215,32 @@ export class Game {
             }
         }
 
-        // Call player's update method with all required arguments
         this.player.update(this.terrain, this.canvas.width, this.canvas.height, this.cameraX, this.cameraY);
 
-        // Log player's position and digging status for debugging
         console.log(`Player position: (${this.player.getX()}, ${this.player.getY()}), Digging: ${this.player.isDigging()}`);
 
-        // Health recovery over time (shield does not recover)
-        if (Date.now() - this.lastHealthRecoveryTime > 500) { // Recover health every 0.5 seconds
-            this.player.recoverHealth(2); // Recover 2 health points
+        if (Date.now() - this.lastHealthRecoveryTime > 500) {
+            this.player.recoverHealth(2);
             this.lastHealthRecoveryTime = Date.now();
         }
 
-        // Update zoom based on player size
         this.updateZoom();
 
-        // Update camera position to follow the player, but limit it to terrain boundaries
         const effectiveWidth = this.canvas.width / this.zoom;
         const effectiveHeight = this.canvas.height / this.zoom;
         this.cameraX = Math.max(0, Math.min(this.terrain.getWidth() - effectiveWidth, this.player.getX() - effectiveWidth / 2));
         this.cameraY = Math.max(0, Math.min(this.terrain.getHeight() - effectiveHeight, this.player.getY() - effectiveHeight / 2));
 
-        // Update enemies
-        this.enemies.forEach((enemy, index) => {
-            enemy.update(this.terrain, this.canvas.width, this.canvas.height, this.cameraX, this.cameraY);
-            
-            // Check for collisions with player
-            const dx = this.player.getX() - enemy.getX();
-            const dy = this.player.getY() - enemy.getY();
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance < (this.player.getSize() + enemy.getSize()) / 2) {
-                // Collision detected
-                const damage = Math.floor(enemy.getSize() * 0.5); // 50% of enemy size as damage
-                this.player.takeDamage(damage);
-                console.log(`Player took ${damage} damage from enemy`);
-
-                if (this.player.getSize() > enemy.getSize()) {
-                    // Player is larger, consume the enemy
-                    const scoreIncrease = Math.floor(enemy.getSize());
-                    this.player.adjustScore(scoreIncrease);
-                    console.log(`Player defeated enemy. Score increase: ${scoreIncrease}`);
-                    this.enemies.splice(index, 1);
-                } else {
-                    // Enemy is larger or equal, bounce away
-                    const bounceDistance = 20;
-                    const bounceX = enemy.getX() + (dx / distance) * bounceDistance;
-                    const bounceY = enemy.getY() + (dy / distance) * bounceDistance;
-                    enemy.setPosition(bounceX, bounceY);
-                }
-            }
-        });
-
-        // Spawn new enemies if needed
-        if (this.enemies.length < this.maxEnemies) {
-            const enemiesToSpawn = Math.min(5, this.maxEnemies - this.enemies.length); // Increased from 3 to 5
-            this.spawnEnemies(enemiesToSpawn);
+        if (this.currentDimension === 'grass') {
+            this.updateCloudMobs(deltaTime);
+        } else {
+            this.updateEnemies();
         }
 
-        // Update player's emote
         this.player.updateEmote(deltaTime);
 
-        // Update enemies' emotes
         this.enemies.forEach(enemy => enemy.updateEmote(deltaTime));
 
-        // Update portal cooldown
         if (this.portalCooldown > 0) {
             this.portalCooldown -= deltaTime;
             if (this.portalCooldown < 0) {
@@ -281,16 +248,17 @@ export class Game {
             }
         }
 
-        // Check if player is on the portal
         let portalLocation;
-        if (this.isInAlternateDimension) {
+        if (this.currentDimension === 'alternate') {
             portalLocation = this.alternateDimension!.getPortalLocation();
+        } else if (this.currentDimension === 'grass') {
+            portalLocation = this.grassDimension!.getPortalLocation();
         } else {
             portalLocation = this.terrain.getPortalLocation();
         }
         const playerX = this.player.getX();
         const playerY = this.player.getY();
-        const portalRadius = 25; // Half the size of the portal
+        const portalRadius = 25;
 
         if (Math.abs(playerX - portalLocation.x) < portalRadius && 
             Math.abs(playerY - portalLocation.y) < portalRadius &&
@@ -299,22 +267,19 @@ export class Game {
             this.portalCooldown = this.PORTAL_COOLDOWN_DURATION;
         }
 
-        // Update the current dimension
-        if (this.isInAlternateDimension) {
+        if (this.currentDimension === 'alternate') {
             this.alternateDimension!.update(this.player, this.enemies);
-            if (this.player.isDigging()) {
-                // The digging in alternate dimension is handled in AlternateDimension.update
-            }
+        } else if (this.currentDimension === 'grass') {
+            this.grassDimension!.update(this.player, this.cloudMobs);
         } else {
             if (this.player.isDigging()) {
                 this.player.dig(this.terrain);
             }
         }
 
-        // Check if player is dead
         if (this.player.isDead() && !this.isGameOver) {
             this.handlePlayerDeath();
-            return; // Exit the update method early
+            return;
         }
     }
 
@@ -323,36 +288,28 @@ export class Game {
         const minPlayerSize = 20;
         const maxPlayerSize = 1000;
         
-        // Calculate zoom factor based on player size using a logarithmic function
         const zoomFactor = Math.log(playerSize / minPlayerSize) / Math.log(maxPlayerSize / minPlayerSize);
         let newZoom = this.maxZoom * Math.pow(0.05, zoomFactor);
         
-        // Apply the zoom cap
         newZoom = Math.max(this.zoomCap, newZoom);
         
-        // Smooth transition to the new zoom level
         this.zoom = this.zoom * 0.9 + newZoom * 0.1;
         
-        // Clamp zoom between minZoom and maxZoom
         this.zoom = Math.max(this.minZoom, Math.min(this.maxZoom, this.zoom));
     }
 
     private render() {
-        // Clear the entire canvas
         this.context.fillStyle = 'black';
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         this.context.save();
         
-        // Apply zoom and translation
         this.context.scale(this.zoom, this.zoom);
         
-        // Adjust translation to keep player centered
         const centerX = this.canvas.width / (2 * this.zoom);
         const centerY = this.canvas.height / (2 * this.zoom);
         this.context.translate(centerX - this.player.getX(), centerY - this.player.getY());
         
-        // Calculate visible area
         const visibleWidth = this.canvas.width / this.zoom;
         const visibleHeight = this.canvas.height / this.zoom;
         const startX = Math.floor((this.player.getX() - visibleWidth / 2) / 10);
@@ -360,20 +317,17 @@ export class Game {
         const endX = Math.ceil((this.player.getX() + visibleWidth / 2) / 10);
         const endY = Math.ceil((this.player.getY() + visibleHeight / 2) / 10);
 
-        if (this.isInAlternateDimension) {
+        if (this.currentDimension === 'grass') {
+            this.grassDimension!.render(this.context, this.player, this.canvas.width, this.canvas.height, this.zoom);
+            this.renderCloudMobs();
+        } else if (this.currentDimension === 'alternate') {
             this.alternateDimension!.render(this.context, this.player, this.canvas.width, this.canvas.height, this.zoom);
+            this.renderEnemies();
         } else {
             this.terrain.generateTerrain(this.context, startX, startY, endX, endY);
+            this.renderEnemies();
         }
         
-        // Draw enemies
-        this.enemies.forEach(enemy => {
-            if (this.isEnemyVisible(enemy, visibleWidth, visibleHeight)) {
-                enemy.draw(visibleWidth, visibleHeight);
-            }
-        });
-        
-        // Draw player
         this.player.draw(visibleWidth, visibleHeight);
         
         this.context.restore();
@@ -384,7 +338,6 @@ export class Game {
             this.renderEmoteWheel();
         }
 
-        // Render portal cooldown indicator
         if (this.portalCooldown > 0) {
             this.renderPortalCooldown();
         }
@@ -393,17 +346,26 @@ export class Game {
             this.renderGameOverMessage();
         }
 
-        // Render minimap
-        if (this.isInAlternateDimension) {
+        if (this.currentDimension !== 'normal') {
             this.renderMinimap(this.context, 200, 200);
         }
     }
 
-    private isEnemyVisible(enemy: Enemy, visibleWidth: number, visibleHeight: number): boolean {
+    private renderEnemies() {
+        this.enemies.forEach(enemy => {
+            if (this.isEnemyVisible(enemy)) {
+                enemy.draw(this.canvas.width / this.zoom, this.canvas.height / this.zoom);
+            }
+        });
+    }
+
+    private isEnemyVisible(enemy: Enemy): boolean {
         const enemyX = enemy.getX();
         const enemyY = enemy.getY();
         const playerX = this.player.getX();
         const playerY = this.player.getY();
+        const visibleWidth = this.canvas.width / this.zoom;
+        const visibleHeight = this.canvas.height / this.zoom;
 
         return (
             enemyX >= playerX - visibleWidth / 2 &&
@@ -417,15 +379,48 @@ export class Game {
         for (let i = 0; i < count; i++) {
             const x = Math.random() * this.terrain.getWidth();
             const y = Math.random() * this.terrain.getHeight();
-            const enemy = new Enemy(x, y, this.terrain.getWidth(), this.terrain.getHeight(), this.context, this.player, this.terrain); // Pass terrain here
+            const enemy = new Enemy(x, y, this.terrain.getWidth(), this.terrain.getHeight(), this.context, this.player, this.terrain);
             this.enemies.push(enemy);
+        }
+    }
+
+    private updateEnemies() {
+        this.enemies.forEach((enemy, index) => {
+            enemy.update(this.terrain, this.canvas.width, this.canvas.height, this.cameraX, this.cameraY);
+            
+            const dx = this.player.getX() - enemy.getX();
+            const dy = this.player.getY() - enemy.getY();
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < (this.player.getSize() + enemy.getSize()) / 2) {
+                const damage = Math.floor(enemy.getSize() * 0.5);
+                this.player.takeDamage(damage);
+                console.log(`Player took ${damage} damage from enemy`);
+
+                if (this.player.getSize() > enemy.getSize()) {
+                    const scoreIncrease = Math.floor(enemy.getSize());
+                    this.player.adjustScore(scoreIncrease);
+                    console.log(`Player defeated enemy. Score increase: ${scoreIncrease}`);
+                    this.enemies.splice(index, 1);
+                } else {
+                    const bounceDistance = 20;
+                    const bounceX = enemy.getX() + (dx / distance) * bounceDistance;
+                    const bounceY = enemy.getY() + (dy / distance) * bounceDistance;
+                    enemy.setPosition(bounceX, bounceY);
+                }
+            }
+        });
+
+        if (this.enemies.length < this.maxEnemies) {
+            const enemiesToSpawn = Math.min(5, this.maxEnemies - this.enemies.length);
+            this.spawnEnemies(enemiesToSpawn);
         }
     }
 
     public toggleControls() {
         this.isMouseControl = !this.isMouseControl;
         if (this.isMouseControl) {
-            this.keysPressed.clear();  // Clear any pressed keys when switching to mouse control
+            this.keysPressed.clear();
         }
         console.log(`Mouse control is now ${this.isMouseControl ? 'enabled' : 'disabled'}`);
     }
@@ -510,30 +505,27 @@ export class Game {
 
     private toggleDimension() {
         if (this.portalCooldown === 0) {
-            this.isInAlternateDimension = !this.isInAlternateDimension;
-            this.player.setInAlternateDimension(this.isInAlternateDimension);
-            if (this.isInAlternateDimension) {
-                console.log("Entered alternate dimension");
-                this.alternateDimension!.generateNewPortalLocation();
-                const alternateDimensionPortal = this.alternateDimension!.getPortalLocation();
-                // Add a small random offset to avoid spawning directly on the portal
-                const offsetX = (Math.random() - 0.5) * 50;
-                const offsetY = (Math.random() - 0.5) * 50;
-                this.player.setPosition(alternateDimensionPortal.x + offsetX, alternateDimensionPortal.y + offsetY);
-            } else {
-                console.log("Returned to normal dimension");
-                const normalDimensionPortal = this.terrain.getPortalLocation();
-                // Add a small random offset to avoid spawning directly on the portal
-                const offsetX = (Math.random() - 0.5) * 50;
-                const offsetY = (Math.random() - 0.5) * 50;
-                this.player.setPosition(normalDimensionPortal.x + offsetX, normalDimensionPortal.y + offsetY);
+            switch (this.currentDimension) {
+                case 'normal':
+                    this.currentDimension = 'alternate';
+                    this.player.setInAlternateDimension(true);
+                    const alternateDimensionPortal = this.alternateDimension!.getPortalLocation();
+                    this.player.setPosition(alternateDimensionPortal.x, alternateDimensionPortal.y);
+                    break;
+                case 'alternate':
+                    this.currentDimension = 'grass';
+                    const grassDimensionPortal = this.grassDimension!.getPortalLocation();
+                    this.player.setPosition(grassDimensionPortal.x, grassDimensionPortal.y);
+                    break;
+                case 'grass':
+                    this.currentDimension = 'normal';
+                    this.player.setInAlternateDimension(false);
+                    const normalDimensionPortal = this.terrain.getPortalLocation();
+                    this.player.setPosition(normalDimensionPortal.x, normalDimensionPortal.y);
+                    break;
             }
             this.portalCooldown = this.PORTAL_COOLDOWN_DURATION;
-            
-            // Force an update of the camera position
             this.updateCameraPosition();
-            
-            // Update minimap visibility
             this.updateMinimapVisibility();
         } else {
             console.log("Portal on cooldown. Time remaining:", this.portalCooldown / 1000, "seconds");
@@ -554,15 +546,12 @@ export class Game {
         const x = (this.canvas.width - barWidth) / 2;
         const y = 50;
 
-        // Draw background
         this.context.fillStyle = 'rgba(0, 0, 0, 0.5)';
         this.context.fillRect(x, y, barWidth, barHeight);
 
-        // Draw cooldown progress
         this.context.fillStyle = 'rgba(0, 100, 255, 0.7)';
         this.context.fillRect(x, y, barWidth * (1 - cooldownPercentage), barHeight);
 
-        // Draw text
         this.context.fillStyle = 'white';
         this.context.font = '14px Arial';
         this.context.textAlign = 'center';
@@ -575,10 +564,8 @@ export class Game {
         this.isGameOver = true;
         this.gameOverMessage = "Game Over! You have died.";
 
-        // Render the game over message immediately
         this.render();
 
-        // Reload the page after 1 second
         setTimeout(() => {
             window.location.reload();
         }, 1000);
@@ -602,16 +589,21 @@ export class Game {
     }
 
     public renderMinimap(context: CanvasRenderingContext2D, width: number, height: number) {
-        if (!this.alternateDimension) return;
+        if (this.currentDimension === 'alternate' && this.alternateDimension) {
+            this.renderAlternateDimensionMinimap(context, width, height);
+        } else if (this.currentDimension === 'grass' && this.grassDimension) {
+            this.renderGrassDimensionMinimap(context, width, height);
+        }
+    }
 
-        const scale = Math.min(width / this.alternateDimension.getWidth(), height / this.alternateDimension.getHeight());
+    private renderAlternateDimensionMinimap(context: CanvasRenderingContext2D, width: number, height: number) {
+        const scale = Math.min(width / this.alternateDimension!.getWidth(), height / this.alternateDimension!.getHeight());
 
         context.fillStyle = '#000033'; // Dark blue background
         context.fillRect(0, 0, width, height);
 
-        // Draw walls
-        context.fillStyle = 'white';
-        this.alternateDimension.getWalls().forEach(wall => {
+        context.fillStyle = 'white'; // Walls
+        this.alternateDimension!.getWalls().forEach(wall => {
             context.fillRect(
                 wall.x * scale,
                 wall.y * scale,
@@ -620,31 +612,127 @@ export class Game {
             );
         });
 
-        // Draw portal
-        const portal = this.alternateDimension.getPortalLocation();
-        context.fillStyle = '#00FF00'; // Green
+        const portal = this.alternateDimension!.getPortalLocation();
+        context.fillStyle = '#00FF00'; // Green portal
         context.beginPath();
         context.arc(portal.x * scale, portal.y * scale, 5, 0, Math.PI * 2);
         context.fill();
 
-        // Draw player position if in alternate dimension
-        if (this.isInAlternateDimension) {
-            context.fillStyle = 'red';
+        context.fillStyle = 'red'; // Player
+        context.beginPath();
+        context.arc(this.player.getX() * scale, this.player.getY() * scale, 3, 0, Math.PI * 2);
+        context.fill();
+    }
+
+    private renderGrassDimensionMinimap(context: CanvasRenderingContext2D, width: number, height: number) {
+        const scale = Math.min(width / this.grassDimension!.getWidth(), height / this.grassDimension!.getHeight());
+
+        context.fillStyle = '#87CEEB'; // Sky blue background
+        context.fillRect(0, 0, width, height);
+
+        context.fillStyle = '#228B22'; // Forest green for grass patches
+        this.grassDimension!.getGrassPatches().forEach(patch => {
             context.beginPath();
-            context.arc(this.player.getX() * scale, this.player.getY() * scale, 3, 0, Math.PI * 2);
+            context.arc(patch.x * scale, patch.y * scale, patch.radius * scale, 0, Math.PI * 2);
             context.fill();
-        }
+        });
+
+        context.fillStyle = '#8B4513'; // Saddle brown for walls/trees
+        this.grassDimension!.getWalls().forEach(wall => {
+            context.fillRect(
+                wall.x * scale,
+                wall.y * scale,
+                wall.width * scale,
+                wall.height * scale
+            );
+        });
+
+        const portal = this.grassDimension!.getPortalLocation();
+        context.fillStyle = '#00FF00'; // Green portal
+        context.beginPath();
+        context.arc(portal.x * scale, portal.y * scale, 5, 0, Math.PI * 2);
+        context.fill();
+
+        context.fillStyle = 'red'; // Player
+        context.beginPath();
+        context.arc(this.player.getX() * scale, this.player.getY() * scale, 3, 0, Math.PI * 2);
+        context.fill();
     }
 
     private updateMinimapVisibility() {
         const minimapCanvas = document.querySelector('canvas:not(#gameCanvas)') as HTMLCanvasElement;
         if (minimapCanvas) {
-            minimapCanvas.style.display = this.isInAlternateDimension ? 'block' : 'none';
+            minimapCanvas.style.display = this.currentDimension !== 'normal' ? 'block' : 'none';
         }
     }
 
-    // Helper method to calculate distance between two points
     private distanceBetween(x1: number, y1: number, x2: number, y2: number): number {
         return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+    }
+
+    private updateCloudMobs(deltaTime: number) {
+        this.cloudMobs.forEach((cloudMob, index) => {
+            cloudMob.update(deltaTime);
+            
+            const dx = this.player.getX() - cloudMob.getX();
+            const dy = this.player.getY() - cloudMob.getY();
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < (this.player.getSize() + cloudMob.getSize()) / 2) {
+                // Collision detected
+                const damage = Math.floor(this.player.getSize() * 0.1); // Player deals 10% of its size as damage
+                cloudMob.takeDamage(damage);
+                cloudMob.bounceOff(this.player.getX(), this.player.getY());
+
+                if (cloudMob.isDead()) {
+                    const scoreIncrease = Math.floor(cloudMob.getSize());
+                    this.player.adjustScore(scoreIncrease);
+                    console.log(`Player destroyed cloud. Score increase: ${scoreIncrease}`);
+                    this.cloudMobs.splice(index, 1);
+                } else {
+                    console.log(`Cloud took ${damage} damage. Remaining health: ${cloudMob.getHealth()}`);
+                }
+            }
+        });
+
+        if (this.cloudMobs.length < this.maxCloudMobs) {
+            const cloudsToSpawn = Math.min(2, this.maxCloudMobs - this.cloudMobs.length);
+            this.spawnCloudMobs(cloudsToSpawn);
+        }
+    }
+
+    private spawnCloudMobs(count: number) {
+        for (let i = 0; i < count; i++) {
+            const x = Math.random() * this.terrain.getWidth();
+            const y = Math.random() * this.terrain.getHeight();
+            const size = Math.random() * 30 + 20; // Cloud size between 20 and 50
+            const health = size * 10; // Health proportional to size
+            const cloudMob = new CloudMob(x, y, size, health, this.context, this.player, this.terrain);
+            this.cloudMobs.push(cloudMob);
+        }
+    }
+
+    private renderCloudMobs() {
+        this.cloudMobs.forEach(cloudMob => {
+            if (this.isCloudMobVisible(cloudMob)) {
+                cloudMob.draw();
+            }
+        });
+    }
+
+    private isCloudMobVisible(cloudMob: CloudMob): boolean {
+        const cloudMobX = cloudMob.getX();
+        const cloudMobY = cloudMob.getY();
+        const playerX = this.player.getX();
+        const playerY = this.player.getY();
+        const visibleWidth = this.canvas.width / this.zoom;
+        const visibleHeight = this.canvas.height / this.zoom;
+
+        return (
+            cloudMobX >= playerX - visibleWidth / 2 &&
+            cloudMobX <= playerX + visibleWidth / 2 &&
+            cloudMobY >= playerY - visibleHeight / 2 &&
+            cloudMobY <= playerY + visibleHeight / 2
+        );
     }
 }

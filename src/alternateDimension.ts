@@ -1,5 +1,6 @@
 import { Player } from './player';
 import { Enemy } from './enemy';
+import { CloudMob } from './cloudMob';
 
 interface AlternateDimensionDot {
     x: number;
@@ -14,30 +15,52 @@ interface Wall {
     height: number;
 }
 
+export enum DimensionType {
+    Dark,
+    Grass
+}
+
 export class AlternateDimension {
     private width: number;
     private height: number;
     private context: CanvasRenderingContext2D;
     private portalLocation: { x: number, y: number };
     private dots: AlternateDimensionDot[];
-    private dotRadius: number = 25; // Same size as the portal
-    private portalRadius: number = 25; // Explicitly define portal radius
+    private dotRadius: number = 25;
+    private portalRadius: number = 25;
     private walls: Wall[];
+    private dimensionType: DimensionType;
+    private grassPatches: { x: number, y: number, radius: number }[];
 
-    constructor(width: number, height: number, context: CanvasRenderingContext2D) {
+    constructor(width: number, height: number, context: CanvasRenderingContext2D, dimensionType: DimensionType = DimensionType.Dark) {
         this.width = width;
         this.height = height;
         this.context = context;
+        this.dimensionType = dimensionType;
         this.walls = this.createFixedMap();
         this.portalLocation = this.findSafePortalLocation();
         this.dots = this.generateDots();
+        this.grassPatches = this.generateGrassPatches();
+    }
+
+    private generateGrassPatches(): { x: number, y: number, radius: number }[] {
+        const patches = [];
+        const patchCount = 50;
+        for (let i = 0; i < patchCount; i++) {
+            patches.push({
+                x: Math.random() * this.width,
+                y: Math.random() * this.height,
+                radius: Math.random() * 100 + 50
+            });
+        }
+        return patches;
     }
 
     private generateDots(): AlternateDimensionDot[] {
         const dots: AlternateDimensionDot[] = [];
-        const dotCount = 1000; // Reduced dot count due to larger size
+        const dotCount = 1000;
         let attempts = 0;
-        const maxAttempts = 10000; // Prevent infinite loop
+        const maxAttempts = 10000;
 
         while (dots.length < dotCount && attempts < maxAttempts) {
             const x = Math.random() * this.width;
@@ -225,7 +248,7 @@ export class AlternateDimension {
         return { x, y };
     }
 
-    public update(player: Player, enemies: Enemy[]) {
+    public update(player: Player, entities: (Enemy | CloudMob)[]): void {
         // Check if player is digging any dots
         const playerRadius = player.getSize() / 2;
         this.dots.forEach(dot => {
@@ -242,23 +265,53 @@ export class AlternateDimension {
 
         // Check for collisions with walls
         this.walls.forEach(wall => {
-            if (this.checkCollision(player, wall)) {
+            if (this.checkCollisionWithWall(player, wall)) {
                 this.resolveCollision(player, wall);
+            }
+        });
+
+        if (this.dimensionType === DimensionType.Grass) {
+            this.updateGrassDimension(player);
+        }
+
+        // Update entities (enemies or cloud mobs)
+        entities.forEach(entity => {
+            if (this.checkCollision(entity, player)) {
+                this.resolveEntityCollision(entity, player);
             }
         });
     }
 
-    private checkCollision(player: Player, wall: Wall): boolean {
-        const playerSize = player.getSize();
-        const playerLeft = player.getX() - playerSize / 2;
-        const playerRight = player.getX() + playerSize / 2;
-        const playerTop = player.getY() - playerSize / 2;
-        const playerBottom = player.getY() + playerSize / 2;
+    private updateGrassDimension(player: Player) {
+        // Check if player is on grass
+        const playerOnGrass = this.grassPatches.some(patch => {
+            const dx = player.getX() - patch.x;
+            const dy = player.getY() - patch.y;
+            return Math.sqrt(dx * dx + dy * dy) <= patch.radius;
+        });
 
-        return playerLeft < wall.x + wall.width &&
-               playerRight > wall.x &&
-               playerTop < wall.y + wall.height &&
-               playerBottom > wall.y;
+        if (playerOnGrass) {
+            player.recoverHealth(0.1); // Heal player slightly when on grass
+        }
+    }
+
+    private checkCollision(entity1: { getX: () => number, getY: () => number, getSize: () => number }, entity2: { getX: () => number, getY: () => number, getSize: () => number }): boolean {
+        const dx = entity1.getX() - entity2.getX();
+        const dy = entity1.getY() - entity2.getY();
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < (entity1.getSize() + entity2.getSize()) / 2;
+    }
+
+    private checkCollisionWithWall(entity: { getX: () => number, getY: () => number, getSize: () => number }, wall: Wall): boolean {
+        const entityLeft = entity.getX() - entity.getSize() / 2;
+        const entityRight = entity.getX() + entity.getSize() / 2;
+        const entityTop = entity.getY() - entity.getSize() / 2;
+        const entityBottom = entity.getY() + entity.getSize() / 2;
+
+        return entityLeft < wall.x + wall.width &&
+               entityRight > wall.x &&
+               entityTop < wall.y + wall.height &&
+               entityBottom > wall.y;
     }
 
     private resolveCollision(player: Player, wall: Wall) {
@@ -288,7 +341,33 @@ export class AlternateDimension {
         }
     }
 
+    private resolveEntityCollision(entity: Enemy | CloudMob, player: Player): void {
+        // Handle collision based on entity type
+        if (entity instanceof Enemy) {
+            // Existing enemy collision logic
+            const damage = Math.floor(entity.getSize() * 0.5);
+            player.takeDamage(damage);
+        } else if (entity instanceof CloudMob) {
+            // Cloud mob collision logic (no damage, just bounce)
+            const dx = player.getX() - entity.getX();
+            const dy = player.getY() - entity.getY();
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const bounceDistance = 20;
+            const bounceX = entity.getX() + (dx / distance) * bounceDistance;
+            const bounceY = entity.getY() + (dy / distance) * bounceDistance;
+            entity.setPosition(bounceX, bounceY);
+        }
+    }
+
     public render(context: CanvasRenderingContext2D, player: Player, canvasWidth: number, canvasHeight: number, zoom: number) {
+        if (this.dimensionType === DimensionType.Dark) {
+            this.renderDarkDimension(context, player, canvasWidth, canvasHeight, zoom);
+        } else {
+            this.renderGrassDimension(context, player, canvasWidth, canvasHeight, zoom);
+        }
+    }
+
+    private renderDarkDimension(context: CanvasRenderingContext2D, player: Player, canvasWidth: number, canvasHeight: number, zoom: number) {
         // Fill the entire visible area with a dark background
         context.fillStyle = '#000033'; // Dark blue background
         context.fillRect(player.getX() - canvasWidth / (2 * zoom), player.getY() - canvasHeight / (2 * zoom), canvasWidth / zoom, canvasHeight / zoom);
@@ -301,6 +380,42 @@ export class AlternateDimension {
 
         // Draw the diggable dots
         context.fillStyle = '#FFD700'; // Gold color for the dots
+        this.dots.forEach(dot => {
+            if (dot.present) {
+                context.beginPath();
+                context.arc(dot.x, dot.y, this.dotRadius, 0, Math.PI * 2);
+                context.fill();
+            }
+        });
+
+        // Draw the portal back to the normal dimension (green)
+        context.fillStyle = '#00FF00'; // Bright green color
+        context.beginPath();
+        context.arc(this.portalLocation.x, this.portalLocation.y, this.portalRadius, 0, Math.PI * 2);
+        context.fill();
+    }
+
+    private renderGrassDimension(context: CanvasRenderingContext2D, player: Player, canvasWidth: number, canvasHeight: number, zoom: number) {
+        // Fill the entire visible area with a light background
+        context.fillStyle = '#87CEEB'; // Sky blue background
+        context.fillRect(player.getX() - canvasWidth / (2 * zoom), player.getY() - canvasHeight / (2 * zoom), canvasWidth / zoom, canvasHeight / zoom);
+
+        // Draw grass patches
+        context.fillStyle = '#228B22'; // Forest green
+        this.grassPatches.forEach(patch => {
+            context.beginPath();
+            context.arc(patch.x, patch.y, patch.radius, 0, Math.PI * 2);
+            context.fill();
+        });
+
+        // Draw the walls (as trees or rocks in this dimension)
+        context.fillStyle = '#8B4513'; // Saddle Brown for trees/rocks
+        this.walls.forEach(wall => {
+            context.fillRect(wall.x, wall.y, wall.width, wall.height);
+        });
+
+        // Draw the diggable dots (as flowers in this dimension)
+        context.fillStyle = '#FF69B4'; // Hot Pink for flowers
         this.dots.forEach(dot => {
             if (dot.present) {
                 context.beginPath();
@@ -334,5 +449,17 @@ export class AlternateDimension {
 
     public generateNewPortalLocation(): void {
         this.portalLocation = this.findSafePortalLocation();
+    }
+
+    public setDimensionType(type: DimensionType) {
+        this.dimensionType = type;
+    }
+
+    public getDimensionType(): DimensionType {
+        return this.dimensionType;
+    }
+
+    public getGrassPatches(): { x: number, y: number, radius: number }[] {
+        return this.grassPatches;
     }
 }
