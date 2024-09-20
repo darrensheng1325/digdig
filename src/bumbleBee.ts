@@ -109,10 +109,59 @@ export class BumbleBee {
 
     public draw(): void {
         this.context.save();
+        
+        // Draw the main body
         this.context.fillStyle = this.isAngry ? 'red' : 'yellow';
         this.context.beginPath();
         this.context.arc(this.x, this.y, this.size, 0, Math.PI * 2);
         this.context.fill();
+
+        // Draw stripes
+        this.context.fillStyle = 'black';
+        const stripeCount = 3;
+        const stripeWidth = this.size * 0.4; // Adjust this value to change stripe width
+        const stripeSpacing = this.size * 0.5; // Adjust this value to change stripe spacing
+
+        for (let i = 0; i < stripeCount; i++) {
+            this.context.save();
+            this.context.translate(this.x, this.y);
+            this.context.rotate(Math.PI / 4); // Rotate stripes diagonally
+
+            // Calculate stripe position
+            const stripeX = -this.size + (i + 0.5) * stripeSpacing - stripeWidth / 2;
+
+            // Use a clipping region to keep stripes inside the bee
+            this.context.beginPath();
+            this.context.arc(0, 0, this.size, 0, Math.PI * 2);
+            this.context.clip();
+
+            // Draw the stripe
+            this.context.fillRect(
+                stripeX,
+                -this.size,
+                stripeWidth,
+                this.size * 2
+            );
+
+            this.context.restore();
+        }
+
+        // Draw antennae
+        this.context.strokeStyle = 'black';
+        this.context.lineWidth = this.size * 0.1;
+        
+        // Left antenna
+        this.context.beginPath();
+        this.context.moveTo(this.x + this.size * 0.3, this.y - this.size * 0.5);
+        this.context.lineTo(this.x + this.size * 0.6, this.y - this.size * 0.9);
+        this.context.stroke();
+
+        // Right antenna
+        this.context.beginPath();
+        this.context.moveTo(this.x + this.size * 0.5, this.y - this.size * 0.3);
+        this.context.lineTo(this.x + this.size * 0.9, this.y - this.size * 0.6);
+        this.context.stroke();
+
         this.context.restore();
     }
 
