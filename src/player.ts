@@ -37,6 +37,7 @@ export class Player {
     private normalSize: number;
     private alternateDimensionSize: number = 30; // Increased from 20 to 30
     private alternateDimensionSpeedMultiplier: number = 0.5; // 50% slower in alternate dimension
+    private maxHealth: number;
 
     constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D, terrain: Terrain) {
         this.x = x;
@@ -50,6 +51,7 @@ export class Player {
         this.loadOwnedEmotes();
         this.calculateLevelAndXP();
         this.normalSize = this.size;
+        this.maxHealth = 100; // or whatever the max health should be
     }
 
     move(dx: number, dy: number) {
@@ -298,7 +300,7 @@ export class Player {
             this.health = Math.max(0, this.health - amount);
         }
 
-        console.log(`Player health: ${this.health}, Shield: ${this.shield}`);
+        console.log(`Player took ${amount} damage. Health: ${this.health}, Shield: ${this.shield}`);
     }
 
     adjustShield(amount: number) {
@@ -570,6 +572,10 @@ export class Player {
 
     public isDead(): boolean {
         return this.health <= 0;
+    }
+
+    public getMaxHealth(): number {
+        return this.maxHealth;
     }
 }
 

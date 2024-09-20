@@ -1,6 +1,8 @@
 import { Player } from './player';
 import { Enemy } from './enemy';
 import { CloudMob } from './cloudMob';
+import { BumbleBee } from './bumbleBee';
+import { Terrain } from './terrain';
 
 interface AlternateDimensionDot {
     x: number;
@@ -40,12 +42,17 @@ export class AlternateDimension {
     private grassPatches: { x: number, y: number, radius: number }[];
     private islands: { x: number, y: number, radius: number }[] = [];
     private bridges: Bridge[] = [];
+    private bumbleBees: BumbleBee[] = [];
+    private player: Player;
+    private terrain: Terrain;
 
-    constructor(width: number, height: number, context: CanvasRenderingContext2D, dimensionType: DimensionType = DimensionType.Dark) {
+    constructor(width: number, height: number, context: CanvasRenderingContext2D, dimensionType: DimensionType = DimensionType.Dark, player: Player, terrain: Terrain) {
         this.width = width;
         this.height = height;
         this.context = context;
         this.dimensionType = dimensionType;
+        this.player = player;
+        this.terrain = terrain;
         
         if (this.dimensionType === DimensionType.Dark) {
             this.walls = this.createFixedMap();
@@ -53,6 +60,7 @@ export class AlternateDimension {
             this.walls = []; // No walls in grass dimension
             this.islands = this.generatePermanentIslands();
             this.bridges = this.generateBridges();
+            this.generateBumbleBees();
         }
         
         this.regularPortalLocation = this.findSafePortalLocation();
@@ -117,7 +125,7 @@ export class AlternateDimension {
 
             const distAB = Math.sqrt(Math.pow(B.x - A.x, 2) + Math.pow(B.y - A.y, 2));
             const distAC = Math.sqrt(Math.pow(C.x - A.x, 2) + Math.pow(C.y - A.y, 2));
-            const distCB = Math.sqrt(Math.pow(B.x - C.x, 2) + Math.pow(B.y - C.y, 2));
+            const distCB = Math.sqrt(Math.pow(B.x - C.x, 2) + Math.pow(C.y - B.y, 2));
 
             // Increase the effective width of the bridge hitbox
             const effectiveWidth = bridge.width * 1.5; // 50% wider hitbox
@@ -353,7 +361,7 @@ export class AlternateDimension {
         return { x, y };
     }
 
-    public update(player: Player, entities: (Enemy | CloudMob)[]): void {
+    public update(player: Player, entities: (Enemy | CloudMob)[], deltaTime: number): void {
         // Check if player is digging any dots
         const playerRadius = player.getSize() / 2;
         this.dots.forEach(dot => {
@@ -363,7 +371,7 @@ export class AlternateDimension {
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 if (distance <= playerRadius + this.dotRadius) {
                     dot.present = false;
-                    player.adjustAlternateDimensionScore(10); // Give 10 points for each dot
+                    player.adjustAlternateDimensionScore(1000); // Give 1000 points for each dot
                 }
             }
         });
@@ -377,6 +385,7 @@ export class AlternateDimension {
 
         if (this.dimensionType === DimensionType.Grass) {
             this.updateGrassDimension(player);
+            this.updateBumbleBees(player, deltaTime);
         }
 
         // Update entities (enemies or cloud mobs)
@@ -554,6 +563,9 @@ export class AlternateDimension {
         context.beginPath();
         context.arc(this.grassPortalLocation.x, this.grassPortalLocation.y, this.portalRadius, 0, Math.PI * 2);
         context.fill();
+
+        // Draw bumble bees
+        this.bumbleBees.forEach(bee => bee.draw());
     }
 
     public getRegularPortalLocation(): { x: number, y: number } {
@@ -604,5 +616,62 @@ export class AlternateDimension {
     // Add a method to check if a move is valid
     public isValidMove(x: number, y: number): boolean {
         return this.dimensionType === DimensionType.Dark || this.isOnIslandOrBridge(x, y);
+    }
+
+    private generateBumbleBees(): void {
+        const beeCount = 20; // Adjust this number as needed
+        this.islands.forEach(island => {
+            for (let i = 0; i < beeCount / this.islands.length; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * (island.radius - this.dotRadius);
+                const x = island.x + Math.cos(angle) * distance;
+                const y = island.y + Math.sin(angle) * distance;
+                this.bumbleBees.push(new BumbleBee(x, y, this.context, this.player, this.terrain, island));
+            }
+        });
+    }
+
+    private updateBumbleBees(player: Player, deltaTime: number): void {
+        this.bumbleBees = this.bumbleBees.filter(bee => !bee.isDead());
+        
+        this.bumbleBees.forEach(bee => {
+            bee.update(deltaTime);
+            
+            // Check for collision with player
+            const dx = player.getX() - bee.getX();
+            const dy = player.getY() - bee.getY();
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < (player.getSize() + bee.getSize()) / 2) {
+                if (!bee.isAngered()) {
+                    bee.anger();
+                } else {
+                    const playerMaxHealth = player.getHealth();
+                    const damage = Math.floor(playerMaxHealth * 0.75); // 3/4 of player's max health
+                    player.takeDamage(damage);
+                    bee.takeDamage(10); // Player deals 10 damage to the bee
+                }
+            }
+
+            // Player can damage bees when they're close
+            if (distance < player.getSize() * 1.5) {
+                bee.takeDamage(1); // Player deals 1 damage to the bee when close
+            }
+        });
+
+        // Spawn new bees if needed
+        while (this.bumbleBees.length < 20) {
+            const island = this.islands[Math.floor(Math.random() * this.islands.length)];
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * (island.radius - this.dotRadius);
+            const x = island.x + Math.cos(angle) * distance;
+            const y = island.y + Math.sin(angle) * distance;
+            this.bumbleBees.push(new BumbleBee(x, y, this.context, player, this.terrain, island));
+        }
+    }
+
+    // Add a getter for bumble bees
+    public getBumbleBees(): BumbleBee[] {
+        return this.bumbleBees;
     }
 }

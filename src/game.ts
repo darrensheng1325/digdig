@@ -5,6 +5,7 @@ import { Shop } from './shop';
 import { AlternateDimension, DimensionType } from './alternateDimension';
 import { TitleScreen } from './titleScreen';
 import { CloudMob } from './cloudMob';
+import { BumbleBee } from './bumbleBee';
 
 export class Game {
     private canvas: HTMLCanvasElement;
@@ -38,6 +39,7 @@ export class Game {
     private gameOverMessage: string = '';
     private cloudMobs: CloudMob[] = [];
     private maxCloudMobs: number = 20;
+    private lastDamageSource: 'bee' | 'cloud' | 'enemy' | 'unknown' = 'unknown';
 
     constructor(canvasId: string, titleScreen: TitleScreen) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -78,8 +80,8 @@ export class Game {
         this.enemies = [];
         this.spawnEnemies(20);
         this.shop = new Shop(this.player, this.context);
-        this.alternateDimension = new AlternateDimension(10000, 10000, this.context, DimensionType.Dark);
-        this.grassDimension = new AlternateDimension(10000, 10000, this.context, DimensionType.Grass);
+        this.alternateDimension = new AlternateDimension(10000, 10000, this.context, DimensionType.Dark, this.player, this.terrain);
+        this.grassDimension = new AlternateDimension(10000, 10000, this.context, DimensionType.Grass, this.player, this.terrain);
         this.titleScreen = titleScreen;
 
         this.init();
@@ -251,6 +253,7 @@ export class Game {
 
         if (this.currentDimension === 'grass') {
             this.updateCloudMobs(deltaTime);
+            this.updateBumbleBees(deltaTime);
         } else {
             this.updateEnemies();
         }
@@ -286,16 +289,16 @@ export class Game {
         }
 
         if (this.currentDimension === 'alternate') {
-            this.alternateDimension!.update(this.player, this.enemies);
+            this.alternateDimension!.update(this.player, this.enemies, deltaTime);
         } else if (this.currentDimension === 'grass') {
-            this.grassDimension!.update(this.player, this.cloudMobs);
+            this.grassDimension!.update(this.player, this.cloudMobs, deltaTime);
         } else {
             if (this.player.isDigging()) {
                 this.player.dig(this.terrain);
             }
         }
 
-        if (this.player.isDead() && !this.isGameOver) {
+        if (this.player.isDead()) {
             this.handlePlayerDeath();
             return;
         }
@@ -413,7 +416,8 @@ export class Game {
             if (distance < (this.player.getSize() + enemy.getSize()) / 2) {
                 const damage = Math.floor(enemy.getSize() * 0.5);
                 this.player.takeDamage(damage);
-                console.log(`Player took ${damage} damage from enemy`);
+                this.lastDamageSource = 'enemy';
+                console.log(`Enemy dealt ${damage} damage to player. Player health: ${this.player.getHealth()}`);
 
                 if (this.player.getSize() > enemy.getSize()) {
                     const scoreIncrease = Math.floor(enemy.getSize());
@@ -580,13 +584,27 @@ export class Game {
     private handlePlayerDeath() {
         console.log("Player has died!");
         this.isGameOver = true;
-        this.gameOverMessage = "Game Over! You have died.";
+        
+        let killedByMessage = "an unknown cause";
+        switch (this.lastDamageSource) {
+            case 'bee':
+                killedByMessage = "a bumble bee";
+                break;
+            case 'cloud':
+                killedByMessage = "a cloud mob";
+                break;
+            case 'enemy':
+                killedByMessage = "an enemy";
+                break;
+        }
+        
+        this.gameOverMessage = `Game Over! You have been killed by ${killedByMessage}.`;
 
         this.render();
 
         setTimeout(() => {
             window.location.reload();
-        }, 1000);
+        }, 3000); // Increased to 3 seconds to give more time to read the message
     }
 
     private renderGameOverMessage() {
@@ -713,7 +731,9 @@ export class Game {
                     console.log(`Player destroyed cloud. Score increase: ${scoreIncrease}`);
                     this.cloudMobs.splice(index, 1);
                 } else {
-                    console.log(`Cloud took ${damage} damage. Remaining health: ${cloudMob.getHealth()}`);
+                    this.player.takeDamage(10); // Cloud deals 10 damage to player
+                    this.lastDamageSource = 'cloud';
+                    console.log(`Cloud dealt 10 damage to player. Player health: ${this.player.getHealth()}`);
                 }
             }
         });
@@ -757,5 +777,26 @@ export class Game {
             cloudMobY >= playerY - visibleHeight / 2 &&
             cloudMobY <= playerY + visibleHeight / 2
         );
+    }
+
+    private updateBumbleBees(deltaTime: number) {
+        this.grassDimension!.getBumbleBees().forEach(bee => {
+            bee.update(deltaTime);
+            
+            const dx = this.player.getX() - bee.getX();
+            const dy = this.player.getY() - bee.getY();
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < (this.player.getSize() + bee.getSize()) / 2) {
+                if (bee.isAngered()) {
+                    const damage = Math.floor(this.player.getMaxHealth() * 0.75);
+                    this.player.takeDamage(damage);
+                    this.lastDamageSource = 'bee';
+                    console.log(`Bee dealt ${damage} damage to player. Player health: ${this.player.getHealth()}`);
+                } else {
+                    bee.anger();
+                }
+            }
+        });
     }
 }
