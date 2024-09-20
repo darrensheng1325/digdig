@@ -23,7 +23,8 @@ export class BumbleBee {
     private maxChaseDistance: number = 500; // Maximum distance to chase the player
     private currentIsland: Island;
     private idleAngle: number = Math.random() * Math.PI * 2;
-    private idleSpeed: number = 30; // Idle speed
+    private idleSpeed: number = 20; // Reduced from 30 to 20
+    private retreatDistance: number = 100; // Distance to retreat after attacking
 
     constructor(x: number, y: number, context: CanvasRenderingContext2D, player: Player, terrain: Terrain, island: Island) {
         this.x = x;
@@ -60,7 +61,7 @@ export class BumbleBee {
             this.isAngry = false;
             this.angerTimer = 0;
         } else {
-            const moveSpeed = this.player.getSpeed() * 100; // 100 times player's speed
+            const moveSpeed = this.player.getSpeed() * 75; // Reduced from 100 to 75 times player's speed
             const angle = Math.atan2(this.player.getY() - this.y, this.player.getX() - this.x);
             this.x += Math.cos(angle) * moveSpeed * deltaSeconds;
             this.y += Math.sin(angle) * moveSpeed * deltaSeconds;
@@ -69,6 +70,7 @@ export class BumbleBee {
             if (this.attackCooldown <= 0 && distanceToPlayer < this.size + 20) {
                 this.attackPlayer();
                 this.attackCooldown = this.attackInterval;
+                this.retreatAfterAttack();
             }
 
             this.angerTimer += deltaSeconds * 1000;
@@ -101,10 +103,20 @@ export class BumbleBee {
     }
 
     private attackPlayer(): void {
-        const playerMaxHealth = this.player.getMaxHealth();
-        const damage = Math.floor(playerMaxHealth * 0.75); // 3/4 of player's max health
+        const playerCurrentHealth = this.player.getHealth();
+        const damage = Math.floor(playerCurrentHealth * 0.75); // 3/4 of player's current health
         this.player.takeDamage(damage);
         console.log(`Bee attacked player for ${damage} damage. Player health: ${this.player.getHealth()}`);
+    }
+
+    private retreatAfterAttack(): void {
+        const angle = Math.atan2(this.y - this.player.getY(), this.x - this.player.getX());
+        const newX = this.x + Math.cos(angle) * this.retreatDistance;
+        const newY = this.y + Math.sin(angle) * this.retreatDistance;
+
+        // Ensure the new position is within the terrain boundaries
+        this.x = Math.max(this.size, Math.min(newX, this.terrain.getWidth() - this.size));
+        this.y = Math.max(this.size, Math.min(newY, this.terrain.getHeight() - this.size));
     }
 
     public draw(): void {
