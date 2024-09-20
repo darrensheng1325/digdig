@@ -137,7 +137,16 @@ export class Game {
                 const angle = Math.atan2(dy, dx);
                 const moveX = Math.cos(angle);
                 const moveY = Math.sin(angle);
-                this.player.move(moveX, moveY);
+                const newX = this.player.getX() + moveX * this.player.getSpeed();
+                const newY = this.player.getY() + moveY * this.player.getSpeed();
+
+                if (this.currentDimension === 'grass') {
+                    if (this.grassDimension!.isValidMove(newX, newY)) {
+                        this.player.move(moveX, moveY);
+                    }
+                } else {
+                    this.player.move(moveX, moveY);
+                }
             }
         }
     }
@@ -211,7 +220,16 @@ export class Game {
 
             if (dx !== 0 || dy !== 0) {
                 const speed = this.player.getSpeed();
-                this.player.move(dx * speed, dy * speed);
+                const newX = this.player.getX() + dx * speed;
+                const newY = this.player.getY() + dy * speed;
+
+                if (this.currentDimension === 'grass') {
+                    if (this.grassDimension!.isValidMove(newX, newY)) {
+                        this.player.move(dx * speed, dy * speed);
+                    }
+                } else {
+                    this.player.move(dx * speed, dy * speed);
+                }
             }
         }
 
@@ -250,9 +268,9 @@ export class Game {
 
         let portalLocation;
         if (this.currentDimension === 'alternate') {
-            portalLocation = this.alternateDimension!.getPortalLocation();
+            portalLocation = this.alternateDimension!.getRegularPortalLocation();
         } else if (this.currentDimension === 'grass') {
-            portalLocation = this.grassDimension!.getPortalLocation();
+            portalLocation = this.grassDimension!.getRegularPortalLocation();
         } else {
             portalLocation = this.terrain.getPortalLocation();
         }
@@ -509,12 +527,12 @@ export class Game {
                 case 'normal':
                     this.currentDimension = 'alternate';
                     this.player.setInAlternateDimension(true);
-                    const alternateDimensionPortal = this.alternateDimension!.getPortalLocation();
+                    const alternateDimensionPortal = this.alternateDimension!.getRegularPortalLocation();
                     this.player.setPosition(alternateDimensionPortal.x, alternateDimensionPortal.y);
                     break;
                 case 'alternate':
                     this.currentDimension = 'grass';
-                    const grassDimensionPortal = this.grassDimension!.getPortalLocation();
+                    const grassDimensionPortal = this.grassDimension!.getRegularPortalLocation();
                     this.player.setPosition(grassDimensionPortal.x, grassDimensionPortal.y);
                     break;
                 case 'grass':
@@ -612,8 +630,8 @@ export class Game {
             );
         });
 
-        const portal = this.alternateDimension!.getPortalLocation();
-        context.fillStyle = '#00FF00'; // Green portal
+        const portal = this.alternateDimension!.getRegularPortalLocation();
+        context.fillStyle = '#00BFFF'; // Light blue portal
         context.beginPath();
         context.arc(portal.x * scale, portal.y * scale, 5, 0, Math.PI * 2);
         context.fill();
@@ -627,30 +645,35 @@ export class Game {
     private renderGrassDimensionMinimap(context: CanvasRenderingContext2D, width: number, height: number) {
         const scale = Math.min(width / this.grassDimension!.getWidth(), height / this.grassDimension!.getHeight());
 
-        context.fillStyle = '#87CEEB'; // Sky blue background
+        context.fillStyle = '#87CEEB'; // Sky blue background (water)
         context.fillRect(0, 0, width, height);
 
-        context.fillStyle = '#228B22'; // Forest green for grass patches
-        this.grassDimension!.getGrassPatches().forEach(patch => {
+        context.fillStyle = '#228B22'; // Forest green for islands
+        this.grassDimension!.getIslands().forEach(island => {
             context.beginPath();
-            context.arc(patch.x * scale, patch.y * scale, patch.radius * scale, 0, Math.PI * 2);
+            context.arc(island.x * scale, island.y * scale, island.radius * scale, 0, Math.PI * 2);
             context.fill();
         });
 
-        context.fillStyle = '#8B4513'; // Saddle brown for walls/trees
-        this.grassDimension!.getWalls().forEach(wall => {
-            context.fillRect(
-                wall.x * scale,
-                wall.y * scale,
-                wall.width * scale,
-                wall.height * scale
-            );
+        // Draw bridges on minimap
+        context.strokeStyle = '#8B4513'; // Saddle Brown for bridges
+        this.grassDimension!.getBridges().forEach(bridge => {
+            context.beginPath();
+            context.moveTo(bridge.start.x * scale, bridge.start.y * scale);
+            context.lineTo(bridge.end.x * scale, bridge.end.y * scale);
+            context.lineWidth = bridge.width * scale;
+            context.stroke();
         });
 
-        const portal = this.grassDimension!.getPortalLocation();
-        context.fillStyle = '#00FF00'; // Green portal
+        const regularPortal = this.grassDimension!.getRegularPortalLocation();
+        const grassPortal = this.grassDimension!.getGrassPortalLocation();
+        
+        context.fillStyle = '#00BFFF'; // Light blue for portals
         context.beginPath();
-        context.arc(portal.x * scale, portal.y * scale, 5, 0, Math.PI * 2);
+        context.arc(regularPortal.x * scale, regularPortal.y * scale, 5, 0, Math.PI * 2);
+        context.fill();
+        context.beginPath();
+        context.arc(grassPortal.x * scale, grassPortal.y * scale, 5, 0, Math.PI * 2);
         context.fill();
 
         context.fillStyle = 'red'; // Player

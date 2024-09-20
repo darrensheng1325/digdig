@@ -20,27 +20,125 @@ export enum DimensionType {
     Grass
 }
 
+interface Bridge {
+    start: { x: number, y: number };
+    end: { x: number, y: number };
+    width: number;
+}
+
 export class AlternateDimension {
     private width: number;
     private height: number;
     private context: CanvasRenderingContext2D;
-    private portalLocation: { x: number, y: number };
+    private regularPortalLocation: { x: number, y: number };
+    private grassPortalLocation: { x: number, y: number };
     private dots: AlternateDimensionDot[];
     private dotRadius: number = 25;
     private portalRadius: number = 25;
     private walls: Wall[];
     private dimensionType: DimensionType;
     private grassPatches: { x: number, y: number, radius: number }[];
+    private islands: { x: number, y: number, radius: number }[] = [];
+    private bridges: Bridge[] = [];
 
     constructor(width: number, height: number, context: CanvasRenderingContext2D, dimensionType: DimensionType = DimensionType.Dark) {
         this.width = width;
         this.height = height;
         this.context = context;
         this.dimensionType = dimensionType;
-        this.walls = this.createFixedMap();
-        this.portalLocation = this.findSafePortalLocation();
+        
+        if (this.dimensionType === DimensionType.Dark) {
+            this.walls = this.createFixedMap();
+        } else {
+            this.walls = []; // No walls in grass dimension
+            this.islands = this.generatePermanentIslands();
+            this.bridges = this.generateBridges();
+        }
+        
+        this.regularPortalLocation = this.findSafePortalLocation();
+        this.grassPortalLocation = this.findSafePortalLocation();
         this.dots = this.generateDots();
         this.grassPatches = this.generateGrassPatches();
+    }
+
+    private generatePermanentIslands(): { x: number, y: number, radius: number }[] {
+        return [
+            { x: 1000, y: 1000, radius: 500 },
+            { x: 3000, y: 1500, radius: 600 },
+            { x: 5000, y: 1000, radius: 550 },
+            { x: 7000, y: 1500, radius: 450 },
+            { x: 1500, y: 3000, radius: 400 },
+            { x: 4000, y: 3500, radius: 700 },
+            { x: 6500, y: 3000, radius: 500 },
+            { x: 2000, y: 5000, radius: 550 },
+            { x: 5000, y: 5500, radius: 600 },
+            { x: 8000, y: 5000, radius: 450 },
+            { x: 1000, y: 7000, radius: 500 },
+            { x: 3500, y: 7500, radius: 650 },
+            { x: 6000, y: 7000, radius: 550 },
+            { x: 8000, y: 7500, radius: 400 },
+        ];
+    }
+
+    private generateBridges(): Bridge[] {
+        return [
+            { start: { x: 1500, y: 1000 }, end: { x: 2400, y: 1500 }, width: 200 },
+            { start: { x: 3600, y: 1500 }, end: { x: 4450, y: 1000 }, width: 200 },
+            { start: { x: 5550, y: 1000 }, end: { x: 6550, y: 1500 }, width: 200 },
+            { start: { x: 1500, y: 1500 }, end: { x: 1500, y: 2600 }, width: 200 },
+            { start: { x: 3000, y: 2100 }, end: { x: 3300, y: 3500 }, width: 200 },
+            { start: { x: 4700, y: 3500 }, end: { x: 6000, y: 3000 }, width: 200 },
+            { start: { x: 7000, y: 1950 }, end: { x: 7000, y: 2500 }, width: 200 },
+            { start: { x: 1900, y: 3000 }, end: { x: 2000, y: 4450 }, width: 200 },
+            { start: { x: 4000, y: 4200 }, end: { x: 4400, y: 5500 }, width: 200 },
+            { start: { x: 5600, y: 5500 }, end: { x: 7550, y: 5000 }, width: 200 },
+            { start: { x: 2550, y: 5000 }, end: { x: 3500, y: 6850 }, width: 200 },
+            { start: { x: 5000, y: 6100 }, end: { x: 5450, y: 7000 }, width: 200 },
+            { start: { x: 6550, y: 7000 }, end: { x: 7600, y: 7500 }, width: 200 },
+        ];
+    }
+
+    private isOnIslandOrBridge(x: number, y: number): boolean {
+        return this.isInsideIsland(x, y) || this.isOnBridge(x, y);
+    }
+
+    private isInsideIsland(x: number, y: number): boolean {
+        return this.islands.some(island => {
+            const distance = Math.sqrt(Math.pow(x - island.x, 2) + Math.pow(y - island.y, 2));
+            return distance < island.radius + 5; // Add a 5-pixel buffer
+        });
+    }
+
+    private isOnBridge(x: number, y: number): boolean {
+        return this.bridges.some(bridge => {
+            const A = { x: bridge.start.x, y: bridge.start.y };
+            const B = { x: bridge.end.x, y: bridge.end.y };
+            const C = { x, y };
+
+            const distAB = Math.sqrt(Math.pow(B.x - A.x, 2) + Math.pow(B.y - A.y, 2));
+            const distAC = Math.sqrt(Math.pow(C.x - A.x, 2) + Math.pow(C.y - A.y, 2));
+            const distCB = Math.sqrt(Math.pow(B.x - C.x, 2) + Math.pow(B.y - C.y, 2));
+
+            // Increase the effective width of the bridge hitbox
+            const effectiveWidth = bridge.width * 1.5; // 50% wider hitbox
+            const halfWidth = effectiveWidth / 2;
+
+            // Check if the point is within the bounding box of the bridge
+            const minX = Math.min(A.x, B.x) - halfWidth;
+            const maxX = Math.max(A.x, B.x) + halfWidth;
+            const minY = Math.min(A.y, B.y) - halfWidth;
+            const maxY = Math.max(A.y, B.y) + halfWidth;
+
+            if (C.x < minX || C.x > maxX || C.y < minY || C.y > maxY) {
+                return false;
+            }
+
+            // Check if the point is close enough to the bridge line
+            const crossProduct = Math.abs((C.y - A.y) * (B.x - A.x) - (C.x - A.x) * (B.y - A.y));
+            const distanceFromLine = crossProduct / distAB;
+
+            return distanceFromLine <= halfWidth && (distAC + distCB <= distAB + effectiveWidth / 2);
+        });
     }
 
     private generateGrassPatches(): { x: number, y: number, radius: number }[] {
@@ -65,7 +163,11 @@ export class AlternateDimension {
         while (dots.length < dotCount && attempts < maxAttempts) {
             const x = Math.random() * this.width;
             const y = Math.random() * this.height;
-            if (!this.isInsideWall(x, y) && !this.isOverlappingDots(x, y, dots) && !this.isOverlappingPortal(x, y)) {
+            const isValidLocation = this.dimensionType === DimensionType.Dark
+                ? !this.isInsideWall(x, y)
+                : this.isOnIslandOrBridge(x, y);
+
+            if (isValidLocation && !this.isOverlappingDots(x, y, dots) && !this.isOverlappingPortal(x, y)) {
                 dots.push({
                     x: x,
                     y: y,
@@ -93,8 +195,8 @@ export class AlternateDimension {
     }
 
     private isOverlappingPortal(x: number, y: number): boolean {
-        const dx = x - this.portalLocation.x;
-        const dy = y - this.portalLocation.y;
+        const dx = x - this.regularPortalLocation.x;
+        const dy = y - this.regularPortalLocation.y;
         return Math.sqrt(dx * dx + dy * dy) < (this.dotRadius + this.portalRadius);
     }
 
@@ -227,22 +329,25 @@ export class AlternateDimension {
     }
 
     private findSafePortalLocation(): { x: number, y: number } {
-        let x: number = 0;
-        let y: number = 0;
+        let x = 0;
+        let y = 0;
         let isSafe = false;
 
         while (!isSafe) {
-            x = Math.random() * this.width;
-            y = Math.random() * this.height;
+            if (this.dimensionType === DimensionType.Grass) {
+                const randomIsland = this.islands[Math.floor(Math.random() * this.islands.length)];
+                const angle = Math.random() * 2 * Math.PI;
+                const distance = Math.random() * randomIsland.radius;
+                x = randomIsland.x + distance * Math.cos(angle);
+                y = randomIsland.y + distance * Math.sin(angle);
 
-            isSafe = !this.walls.some(wall => 
-                x - this.portalRadius < wall.x + wall.width &&
-                x + this.portalRadius > wall.x &&
-                y - this.portalRadius < wall.y + wall.height &&
-                y + this.portalRadius > wall.y
-            );
+                isSafe = this.isOnIslandOrBridge(x, y);
+            } else {
+                x = Math.random() * this.width;
+                y = Math.random() * this.height;
 
-            // Remove the check for dots collision here, as dots are not generated yet
+                isSafe = !this.isInsideWall(x, y);
+            }
         }
 
         return { x, y };
@@ -388,30 +493,47 @@ export class AlternateDimension {
             }
         });
 
-        // Draw the portal back to the normal dimension (green)
-        context.fillStyle = '#00FF00'; // Bright green color
+        // Draw the portals
+        context.fillStyle = '#00BFFF'; // Light blue color for portals
         context.beginPath();
-        context.arc(this.portalLocation.x, this.portalLocation.y, this.portalRadius, 0, Math.PI * 2);
+        context.arc(this.regularPortalLocation.x, this.regularPortalLocation.y, this.portalRadius, 0, Math.PI * 2);
+        context.fill();
+        context.beginPath();
+        context.arc(this.grassPortalLocation.x, this.grassPortalLocation.y, this.portalRadius, 0, Math.PI * 2);
         context.fill();
     }
 
     private renderGrassDimension(context: CanvasRenderingContext2D, player: Player, canvasWidth: number, canvasHeight: number, zoom: number) {
-        // Fill the entire visible area with a light background
-        context.fillStyle = '#87CEEB'; // Sky blue background
+        // Fill the entire visible area with a light blue background (water)
+        context.fillStyle = '#87CEEB';
         context.fillRect(player.getX() - canvasWidth / (2 * zoom), player.getY() - canvasHeight / (2 * zoom), canvasWidth / zoom, canvasHeight / zoom);
 
-        // Draw grass patches
-        context.fillStyle = '#228B22'; // Forest green
-        this.grassPatches.forEach(patch => {
+        // Draw islands
+        context.fillStyle = '#228B22'; // Forest green for islands
+        this.islands.forEach(island => {
             context.beginPath();
-            context.arc(patch.x, patch.y, patch.radius, 0, Math.PI * 2);
+            context.arc(island.x, island.y, island.radius, 0, Math.PI * 2);
             context.fill();
         });
 
-        // Draw the walls (as trees or rocks in this dimension)
-        context.fillStyle = '#8B4513'; // Saddle Brown for trees/rocks
-        this.walls.forEach(wall => {
-            context.fillRect(wall.x, wall.y, wall.width, wall.height);
+        // Draw bridges
+        context.strokeStyle = '#8B4513'; // Saddle Brown for bridges
+        this.bridges.forEach(bridge => {
+            context.beginPath();
+            context.moveTo(bridge.start.x, bridge.start.y);
+            context.lineTo(bridge.end.x, bridge.end.y);
+            context.lineWidth = bridge.width;
+            context.stroke();
+        });
+
+        // Draw grass patches on islands
+        context.fillStyle = '#32CD32'; // Lime green for grass patches
+        this.grassPatches.forEach(patch => {
+            if (this.isInsideIsland(patch.x, patch.y)) {
+                context.beginPath();
+                context.arc(patch.x, patch.y, patch.radius, 0, Math.PI * 2);
+                context.fill();
+            }
         });
 
         // Draw the diggable dots (as flowers in this dimension)
@@ -424,15 +546,22 @@ export class AlternateDimension {
             }
         });
 
-        // Draw the portal back to the normal dimension (green)
-        context.fillStyle = '#00FF00'; // Bright green color
+        // Draw the portals
+        context.fillStyle = '#00BFFF'; // Light blue color for portals
         context.beginPath();
-        context.arc(this.portalLocation.x, this.portalLocation.y, this.portalRadius, 0, Math.PI * 2);
+        context.arc(this.regularPortalLocation.x, this.regularPortalLocation.y, this.portalRadius, 0, Math.PI * 2);
+        context.fill();
+        context.beginPath();
+        context.arc(this.grassPortalLocation.x, this.grassPortalLocation.y, this.portalRadius, 0, Math.PI * 2);
         context.fill();
     }
 
-    public getPortalLocation(): { x: number, y: number } {
-        return this.portalLocation;
+    public getRegularPortalLocation(): { x: number, y: number } {
+        return this.regularPortalLocation;
+    }
+
+    public getGrassPortalLocation(): { x: number, y: number } {
+        return this.grassPortalLocation;
     }
 
     public getWalls(): Wall[] {
@@ -448,7 +577,8 @@ export class AlternateDimension {
     }
 
     public generateNewPortalLocation(): void {
-        this.portalLocation = this.findSafePortalLocation();
+        this.regularPortalLocation = this.findSafePortalLocation();
+        this.grassPortalLocation = this.findSafePortalLocation();
     }
 
     public setDimensionType(type: DimensionType) {
@@ -461,5 +591,18 @@ export class AlternateDimension {
 
     public getGrassPatches(): { x: number, y: number, radius: number }[] {
         return this.grassPatches;
+    }
+
+    public getIslands(): { x: number, y: number, radius: number }[] {
+        return this.islands;
+    }
+
+    public getBridges(): Bridge[] {
+        return this.bridges;
+    }
+
+    // Add a method to check if a move is valid
+    public isValidMove(x: number, y: number): boolean {
+        return this.dimensionType === DimensionType.Dark || this.isOnIslandOrBridge(x, y);
     }
 }
