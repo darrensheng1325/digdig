@@ -3,6 +3,7 @@ import { Enemy } from './enemy';
 import { CloudMob } from './cloudMob';
 import { BumbleBee } from './bumbleBee';
 import { Terrain } from './terrain';
+import { Game } from './game';
 
 interface AlternateDimensionDot {
     x: number;
@@ -45,14 +46,16 @@ export class AlternateDimension {
     private bumbleBees: BumbleBee[] = [];
     private player: Player;
     private terrain: Terrain;
+    private game: Game;
 
-    constructor(width: number, height: number, context: CanvasRenderingContext2D, dimensionType: DimensionType = DimensionType.Dark, player: Player, terrain: Terrain) {
+    constructor(width: number, height: number, context: CanvasRenderingContext2D, dimensionType: DimensionType = DimensionType.Dark, player: Player, terrain: Terrain, game: Game) {
         this.width = width;
         this.height = height;
         this.context = context;
         this.dimensionType = dimensionType;
         this.player = player;
         this.terrain = terrain;
+        this.game = game;
         
         if (this.dimensionType === DimensionType.Dark) {
             this.walls = this.createFixedMap();
@@ -626,7 +629,7 @@ export class AlternateDimension {
                 const distance = Math.random() * (island.radius - this.dotRadius);
                 const x = island.x + Math.cos(angle) * distance;
                 const y = island.y + Math.sin(angle) * distance;
-                this.bumbleBees.push(new BumbleBee(x, y, this.context, this.player, this.terrain, island));
+                this.bumbleBees.push(new BumbleBee(x, y, this.context, this.player, this.terrain, island, this.game));
             }
         });
     }
@@ -666,12 +669,17 @@ export class AlternateDimension {
             const distance = Math.random() * (island.radius - this.dotRadius);
             const x = island.x + Math.cos(angle) * distance;
             const y = island.y + Math.sin(angle) * distance;
-            this.bumbleBees.push(new BumbleBee(x, y, this.context, player, this.terrain, island));
+            this.bumbleBees.push(new BumbleBee(x, y, this.context, player, this.terrain, island, this.game));
         }
     }
 
     // Add a getter for bumble bees
     public getBumbleBees(): BumbleBee[] {
         return this.bumbleBees;
+    }
+
+    // Add this method to the AlternateDimension class
+    public setBumbleBees(bees: BumbleBee[]): void {
+        this.bumbleBees = bees;
     }
 }

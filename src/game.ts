@@ -42,6 +42,9 @@ export class Game {
     private maxCloudMobs: number = 20;
     private lastDamageSource: 'bee' | 'cloud' | 'enemy' | 'unknown' = 'unknown';
     private soundManager: SoundManager;
+    private volumeSlider: HTMLInputElement;
+    private muteButton: HTMLButtonElement;
+    private isMuted: boolean = false;
 
     constructor(canvasId: string, titleScreen: TitleScreen) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -83,13 +86,17 @@ export class Game {
         this.enemies = [];
         this.spawnEnemies(20);
         this.shop = new Shop(this.player, this.context, this);
-        this.alternateDimension = new AlternateDimension(10000, 10000, this.context, DimensionType.Dark, this.player, this.terrain);
-        this.grassDimension = new AlternateDimension(10000, 10000, this.context, DimensionType.Grass, this.player, this.terrain);
+        this.alternateDimension = new AlternateDimension(10000, 10000, this.context, DimensionType.Dark, this.player, this.terrain, this);
+        this.grassDimension = new AlternateDimension(10000, 10000, this.context, DimensionType.Grass, this.player, this.terrain, this);
         this.titleScreen = titleScreen;
         this.soundManager = new SoundManager();
+        this.volumeSlider = this.createVolumeSlider();
+        this.muteButton = this.createMuteButton();
         this.soundManager.playBackgroundMusic();
 
         this.init();
+        this.loadSettings();
+        this.applySettings();
     }
 
     private init() {
@@ -259,8 +266,14 @@ export class Game {
         if (this.currentDimension === 'grass') {
             this.updateCloudMobs(deltaTime);
             this.updateBumbleBees(deltaTime);
+        } else if (this.currentDimension === 'alternate') {
+            this.alternateDimension!.update(this.player, this.enemies, deltaTime);
+            this.updateEnemies(true); // Pass true to indicate alternate dimension
         } else {
-            this.updateEnemies();
+            if (this.player.isDigging()) {
+                this.player.dig(this.terrain);
+            }
+            this.updateEnemies(false); // Pass false to indicate normal dimension
         }
 
         this.player.updateEmote(deltaTime);
@@ -411,7 +424,7 @@ export class Game {
         }
     }
 
-    private updateEnemies() {
+    private updateEnemies(isAlternateDimension: boolean) {
         this.enemies.forEach((enemy, index) => {
             enemy.update(this.terrain, this.canvas.width, this.canvas.height, this.cameraX, this.cameraY);
             
@@ -436,6 +449,11 @@ export class Game {
                     const bounceY = enemy.getY() + (dy / distance) * bounceDistance;
                     enemy.setPosition(bounceX, bounceY);
                 }
+            }
+
+            // Only allow digging in the normal dimension
+            if (!isAlternateDimension && enemy.isDigging()) {
+                enemy.dig(this.terrain);
             }
         });
 
@@ -522,8 +540,8 @@ export class Game {
             case Emote.Nervous: return '😰';
             case Emote.Sick: return '🤢';
             case Emote.Rich: return '🤑';
-            case Emote.Strong: return '💪';
-            case Emote.Scared: return '😱';
+            case Emote.Strong: return '';
+            case Emote.Scared: return '';
             case Emote.Crazy: return '🤪';
             case Emote.Evil: return '😈';
             case Emote.Dead: return '💀';
@@ -788,7 +806,9 @@ export class Game {
     }
 
     private updateBumbleBees(deltaTime: number) {
-        this.grassDimension!.getBumbleBees().forEach(bee => {
+        const bees = this.grassDimension!.getBumbleBees();
+        
+        bees.forEach(bee => {
             bee.update(deltaTime);
             
             const dx = this.player.getX() - bee.getX();
@@ -803,9 +823,22 @@ export class Game {
                     console.log(`Bee dealt ${damage} damage to player. Player health: ${this.player.getHealth()}`);
                 } else {
                     bee.anger();
+                    this.soundManager.playAngryBeeSound(); // Play the angry bee sound
                 }
             }
         });
+
+        // Filter out dead bees and stop their buzzing
+        const aliveBees = bees.filter(bee => {
+            if (bee.isDead()) {
+                bee.stopBuzzing();
+                return false;
+            }
+            return true;
+        });
+
+        // Update the bees array in the grass dimension
+        this.grassDimension!.setBumbleBees(aliveBees);
     }
 
     // Add a new method to handle item collection
@@ -816,5 +849,69 @@ export class Game {
 
     public getSoundManager(): SoundManager {
         return this.soundManager;
+    }
+    private createVolumeSlider(): HTMLInputElement {
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '0';
+        slider.max = '1';
+        slider.step = '0.1';
+        slider.value = this.soundManager.getVolume().toString();
+        slider.style.position = 'absolute';
+        slider.style.top = '10px';
+        slider.style.right = '10px';
+        slider.style.width = '100px';
+        slider.style.zIndex = '1000';
+        
+        slider.addEventListener('input', () => {
+            const volume = parseFloat(slider.value);
+            this.soundManager.setVolume(volume);
+        });
+
+        document.body.appendChild(slider);
+        return slider;
+    }
+
+    private createMuteButton(): HTMLButtonElement {
+        const button = document.createElement('button');
+        button.textContent = '🔊'; // Unicode speaker icon
+        button.style.position = 'absolute';
+        button.style.top = '10px';
+        button.style.right = '120px'; // Position it next to the volume slider
+        button.style.zIndex = '1000';
+        button.style.fontSize = '24px';
+        button.style.padding = '5px 10px';
+        button.style.backgroundColor = 'transparent';
+        button.style.border = 'none';
+        button.style.color = 'white';
+        button.style.cursor = 'pointer';
+
+        button.addEventListener('click', () => this.toggleMute());
+
+        document.body.appendChild(button);
+        return button;
+    }
+
+    private toggleMute(): void {
+        this.isMuted = !this.isMuted;
+        this.soundManager.setMute(this.isMuted);
+        this.muteButton.textContent = this.isMuted ? '🔇' : '🔊';
+        if (this.isMuted) {
+            this.volumeSlider.disabled = true;
+        } else {
+            this.volumeSlider.disabled = false;
+        }
+        localStorage.setItem('isMuted', this.isMuted.toString());
+    }
+
+    private loadSettings() {
+        const muteSetting = localStorage.getItem('isMuted');
+        this.isMuted = muteSetting === 'true';
+    }
+
+    private applySettings() {
+        this.soundManager.setMute(this.isMuted);
+        this.muteButton.textContent = this.isMuted ? '🔇' : '🔊';
+        this.volumeSlider.disabled = this.isMuted;
     }
 }

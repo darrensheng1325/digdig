@@ -6,16 +6,22 @@ export class TitleScreen {
     private canvas: HTMLCanvasElement;
     private context: CanvasRenderingContext2D;
     private onStart: () => void;
+    private volumeSlider: HTMLInputElement;
+    private muteButton: HTMLButtonElement;
 
-    constructor(canvas: HTMLCanvasElement, context: CanvasRenderingContext2D, onStart: () => void) {
+    constructor(canvas: HTMLCanvasElement, context: CanvasRenderingContext2D, onStart: () => void, volumeSlider: HTMLInputElement, muteButton: HTMLButtonElement) {
         this.canvas = canvas;
         this.context = context;
         this.onStart = onStart;
+        this.volumeSlider = volumeSlider;
+        this.muteButton = muteButton;
     }
 
     public show() {
         this.draw();
         this.setupEventListeners();
+        this.volumeSlider.style.display = 'none';
+        this.muteButton.style.display = 'none';
     }
 
     private draw() {
@@ -89,6 +95,8 @@ export class TitleScreen {
         if (x >= buttonX && x <= buttonX + buttonWidth &&
             y >= buttonY && y <= buttonY + buttonHeight) {
             this.canvas.onclick = null;
+            this.volumeSlider.style.display = 'block';
+            this.muteButton.style.display = 'block';
             this.onStart();
         }
     }

@@ -9,11 +9,16 @@ class GameManager {
     private controlToggleButton: HTMLButtonElement;
     private minimapCanvas: HTMLCanvasElement;
     private minimapContext: CanvasRenderingContext2D;
+    private volumeSlider: HTMLInputElement;
+    private muteButton: HTMLButtonElement;
+    private isFullscreen: boolean = false;
 
     constructor() {
         this.canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
         this.context = this.canvas.getContext('2d')!;
-        this.titleScreen = new TitleScreen(this.canvas, this.context, () => this.startGame());
+        this.volumeSlider = this.createVolumeSlider();
+        this.muteButton = this.createMuteButton();
+        this.titleScreen = new TitleScreen(this.canvas, this.context, () => this.startGame(), this.volumeSlider, this.muteButton);
         this.controlToggleButton = document.createElement('button');
         this.controlToggleButton.textContent = 'Toggle Controls';
         this.controlToggleButton.style.position = 'absolute';
@@ -34,6 +39,54 @@ class GameManager {
         this.minimapCanvas.style.display = 'none'; // Initially hide the minimap
         document.body.appendChild(this.minimapCanvas);
         this.minimapContext = this.minimapCanvas.getContext('2d')!;
+        this.loadSettings();
+        this.applySettings();
+    }
+
+    private createVolumeSlider(): HTMLInputElement {
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '0';
+        slider.max = '1';
+        slider.step = '0.1';
+        slider.value = '0.5'; // Default volume
+        slider.style.position = 'absolute';
+        slider.style.top = '10px';
+        slider.style.right = '10px';
+        slider.style.width = '100px';
+        slider.style.zIndex = '1000';
+        
+        document.body.appendChild(slider);
+        return slider;
+    }
+
+    private createMuteButton(): HTMLButtonElement {
+        const button = document.createElement('button');
+        button.textContent = '🔊'; // Unicode speaker icon
+        button.style.position = 'absolute';
+        button.style.top = '10px';
+        button.style.right = '120px'; // Position it next to the volume slider
+        button.style.zIndex = '1000';
+        button.style.fontSize = '24px';
+        button.style.padding = '5px 10px';
+        button.style.backgroundColor = 'transparent';
+        button.style.border = 'none';
+        button.style.color = 'white';
+        button.style.cursor = 'pointer';
+
+        document.body.appendChild(button);
+        return button;
+    }
+
+    private loadSettings() {
+        const fullscreenSetting = localStorage.getItem('isFullscreen');
+        this.isFullscreen = fullscreenSetting === 'true';
+    }
+
+    private applySettings() {
+        if (this.isFullscreen) {
+            this.enterFullscreen();
+        }
     }
 
     public init() {
@@ -80,10 +133,24 @@ class GameManager {
 
     private toggleFullscreen() {
         if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen();
-        } else if (document.exitFullscreen) {
+            this.enterFullscreen();
+        } else {
+            this.exitFullscreen();
+        }
+    }
+
+    private enterFullscreen() {
+        document.documentElement.requestFullscreen();
+        this.isFullscreen = true;
+        localStorage.setItem('isFullscreen', 'true');
+    }
+
+    private exitFullscreen() {
+        if (document.exitFullscreen) {
             document.exitFullscreen();
         }
+        this.isFullscreen = false;
+        localStorage.setItem('isFullscreen', 'false');
     }
 
     private updateMinimap() {

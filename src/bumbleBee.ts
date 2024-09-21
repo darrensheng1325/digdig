@@ -1,5 +1,6 @@
 import { Player } from './player';
 import { Terrain } from './terrain';
+import { Game } from './game';
 
 interface Island {
     x: number;
@@ -15,8 +16,8 @@ export class BumbleBee {
     private player: Player;
     private terrain: Terrain;
     private isAngry: boolean = false;
-    private angerDuration: number = 5000; // 5 seconds
     private angerTimer: number = 0;
+    private readonly ANGER_DURATION: number = 5000; // 5 seconds of anger
     private health: number = 100;
     private attackCooldown: number = 0;
     private attackInterval: number = 1000; // 1 second between attacks
@@ -25,14 +26,17 @@ export class BumbleBee {
     private idleAngle: number = Math.random() * Math.PI * 2;
     private idleSpeed: number = 20; // Reduced from 30 to 20
     private retreatDistance: number = 100; // Distance to retreat after attacking
+    private game: Game; // Added game property
+    private isBuzzing: boolean = false;
 
-    constructor(x: number, y: number, context: CanvasRenderingContext2D, player: Player, terrain: Terrain, island: Island) {
+    constructor(x: number, y: number, context: CanvasRenderingContext2D, player: Player, terrain: Terrain, island: Island, game: Game) {
         this.x = x;
         this.y = y;
         this.context = context;
         this.player = player;
         this.terrain = terrain;
         this.currentIsland = island;
+        this.game = game;
     }
 
     public update(deltaTime: number): void {
@@ -42,7 +46,12 @@ export class BumbleBee {
         const distanceToPlayer = Math.sqrt(dx * dx + dy * dy);
 
         if (this.isAngry) {
-            this.updateAngryBehavior(distanceToPlayer, deltaSeconds);
+            this.angerTimer += deltaTime;
+            if (this.angerTimer >= this.ANGER_DURATION) {
+                this.calmDown();
+            } else {
+                this.updateAngryBehavior(distanceToPlayer, deltaSeconds);
+            }
         } else {
             this.updateIdleBehavior(deltaSeconds);
             // Check if player is close enough to anger the bee
@@ -58,8 +67,7 @@ export class BumbleBee {
 
     private updateAngryBehavior(distanceToPlayer: number, deltaSeconds: number): void {
         if (distanceToPlayer > this.maxChaseDistance) {
-            this.isAngry = false;
-            this.angerTimer = 0;
+            this.calmDown();
         } else {
             const moveSpeed = this.player.getSpeed() * 75; // Reduced from 100 to 75 times player's speed
             const angle = Math.atan2(this.player.getY() - this.y, this.player.getX() - this.x);
@@ -71,12 +79,6 @@ export class BumbleBee {
                 this.attackPlayer();
                 this.attackCooldown = this.attackInterval;
                 this.retreatAfterAttack();
-            }
-
-            this.angerTimer += deltaSeconds * 1000;
-            if (this.angerTimer >= this.angerDuration) {
-                this.isAngry = false;
-                this.angerTimer = 0;
             }
         }
     }
@@ -181,8 +183,25 @@ export class BumbleBee {
     public getY(): number { return this.y; }
     public getSize(): number { return this.size; }
     public anger(): void {
-        this.isAngry = true;
-        this.angerTimer = 0;
+        if (!this.isAngry) {
+            this.isAngry = true;
+            this.angerTimer = 0;
+            this.game.getSoundManager().playAngryBeeSound();
+            this.isBuzzing = true;
+        }
+    }
+    private calmDown(): void {
+        if (this.isAngry) {
+            this.isAngry = false;
+            this.angerTimer = 0;
+            this.stopBuzzing();
+        }
+    }
+    public stopBuzzing(): void {
+        if (this.isBuzzing) {
+            this.game.getSoundManager().stopAngryBeeSound();
+            this.isBuzzing = false;
+        }
     }
     public isAngered(): boolean { return this.isAngry; }
     public takeDamage(amount: number): void {

@@ -28,10 +28,7 @@ export class Enemy extends Player {
             this.moveTowardsTarget(terrain);
         }
 
-        const dugBlocks = this.dig(terrain);
-        for (const block of dugBlocks) {
-            this.handleDugBlock(block);
-        }
+        // Remove the digging logic from here, as it's now handled in the Game class
 
         this.updateRingRotation();
 
