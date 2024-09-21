@@ -1,5 +1,6 @@
 import { Player, Emote } from './player';
 import { Terrain, Block } from './terrain';
+import { Game } from './game';
 
 export class Enemy extends Player {
     private target: Player;
@@ -7,8 +8,8 @@ export class Enemy extends Player {
     private randomMovementDuration: number = 0;
     private goldDetectionRadius: number = 100; // Radius to detect gold
 
-    constructor(x: number, y: number, terrainWidth: number, terrainHeight: number, context: CanvasRenderingContext2D, target: Player, terrain: Terrain) {
-        super(x, y, 100, 5, context, terrain);
+    constructor(x: number, y: number, terrainWidth: number, terrainHeight: number, context: CanvasRenderingContext2D, target: Player, terrain: Terrain, game: Game) {
+        super(x, y, 100, 5, context, terrain, game);
         this.target = target;
         this.setSize(30); // Start with a smaller size
     }

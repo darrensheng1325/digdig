@@ -120,7 +120,13 @@ export class Terrain {
         return Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
-    public generateTerrain(context: CanvasRenderingContext2D, startX: number, startY: number, endX: number, endY: number) {
+    public generateTerrain(
+        context: CanvasRenderingContext2D, 
+        startX: number, 
+        startY: number, 
+        endX: number, 
+        endY: number
+    ) {
         // Ensure we're not trying to access blocks outside the terrain
         startX = Math.max(0, startX);
         startY = Math.max(0, startY);

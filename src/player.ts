@@ -1,4 +1,5 @@
 import { Terrain, Block } from './terrain';
+import { Game } from './game';
 
 export enum Emote {
     Happy, Sad, Angry, Surprised, Love,
@@ -38,8 +39,9 @@ export class Player {
     private alternateDimensionSize: number = 30; // Increased from 20 to 30
     private alternateDimensionSpeedMultiplier: number = 0.5; // 50% slower in alternate dimension
     private maxHealth: number;
+    private game: Game;
 
-    constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D, terrain: Terrain) {
+    constructor(x: number, y: number, health: number, attack: number, context: CanvasRenderingContext2D, terrain: Terrain, game: Game) {
         this.x = x;
         this.y = y;
         this.size = 20;
@@ -47,6 +49,7 @@ export class Player {
         this.shield = 0;
         this.context = context;
         this.terrain = terrain;
+        this.game = game;
         this.loadGoldScore();
         this.loadOwnedEmotes();
         this.calculateLevelAndXP();
@@ -101,6 +104,9 @@ export class Player {
                     const block = terrain.removeBlock(this.x + dx, this.y + dy);
                     if (block) {
                         dugBlocks.push(block);
+                        if (block.type === 'gold_ore' && !this.isInAlternateDimension) {
+                            this.game.getSoundManager().playGoldDigSound();
+                        }
                     }
                 }
             }
@@ -522,6 +528,7 @@ export class Player {
             this.ownedEmotes.add(emote);
             this.saveGoldScore();
             this.saveOwnedEmotes();
+            this.game.getSoundManager().playBuyEmoteSound();
             return true;
         }
         return false;

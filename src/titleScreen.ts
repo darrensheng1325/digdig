@@ -29,7 +29,7 @@ export class TitleScreen {
         tempTerrain.generateTerrain(this.context, 0, 0, this.canvas.width / 10, this.canvas.height / 10);
 
         // Create and draw a player
-        const player = new Player(this.canvas.width / 2, this.canvas.height / 2, 100, 10, this.context, tempTerrain);
+        const player = new Player(this.canvas.width / 2, this.canvas.height / 2, 100, 10, this.context, tempTerrain, null as any);
         player.setSize(40);
         player.draw(this.canvas.width, this.canvas.height);
 
@@ -42,7 +42,8 @@ export class TitleScreen {
                 this.canvas.height,
                 this.context,
                 player,
-                tempTerrain
+                tempTerrain,
+                null as any // Pass null as Game instance for the title screen
             );
             enemy.setSize(30);
             enemy.draw(this.canvas.width, this.canvas.height);  // Pass canvas width and height

@@ -1,22 +1,25 @@
 import { Player, Emote } from './player';
+import { Game } from './game';
 
 export class Shop {
-    private isOpen: boolean = false;
     private player: Player;
     private context: CanvasRenderingContext2D;
-    private allEmotes: Emote[] = Object.values(Emote).filter(e => typeof e === 'number') as Emote[];
+    private isOpen: boolean = false;
+    private game: Game;
+    private allEmotes: Emote[] = Object.values(Emote).filter(value => typeof value === 'number') as Emote[];
     private availableEmotes: Emote[] = [];
-    private readonly SHOP_SIZE: number = 12; // Number of emotes displayed in the shop
+    private readonly SHOP_SIZE: number = 8;
 
-    constructor(player: Player, context: CanvasRenderingContext2D) {
+    constructor(player: Player, context: CanvasRenderingContext2D, game: Game) {
         this.player = player;
         this.context = context;
+        this.game = game;
         this.initializeAvailableEmotes();
     }
 
     private initializeAvailableEmotes(): void {
         const ownedEmotes = new Set(this.player.getOwnedEmotes());
-        const unownedEmotes = this.allEmotes.filter(emote => !ownedEmotes.has(emote));
+        const unownedEmotes = this.allEmotes.filter((emote: Emote) => !ownedEmotes.has(emote));
         this.availableEmotes = this.getRandomEmotes(unownedEmotes, this.SHOP_SIZE);
     }
 
@@ -34,8 +37,8 @@ export class Shop {
 
     private updateAvailableEmotes(): void {
         const ownedEmotes = new Set(this.player.getOwnedEmotes());
-        this.availableEmotes = this.availableEmotes.filter(emote => !ownedEmotes.has(emote));
-        const unownedEmotes = this.allEmotes.filter(emote => !ownedEmotes.has(emote) && !this.availableEmotes.includes(emote));
+        this.availableEmotes = this.availableEmotes.filter((emote: Emote) => !ownedEmotes.has(emote));
+        const unownedEmotes = this.allEmotes.filter((emote: Emote) => !ownedEmotes.has(emote) && !this.availableEmotes.includes(emote));
         const newEmotes = this.getRandomEmotes(unownedEmotes, this.SHOP_SIZE - this.availableEmotes.length);
         this.availableEmotes.push(...newEmotes);
     }
@@ -113,14 +116,18 @@ export class Shop {
             const emoteY = startY + Math.floor(index / columns) * (emoteSize + padding);
 
             if (x >= emoteX && x < emoteX + emoteSize && y >= emoteY && y < emoteY + emoteSize) {
-                if (this.player.buyEmote(emote)) {
-                    console.log(`Bought emote: ${Emote[emote]}`);
-                    this.updateAvailableEmotes();
-                } else {
-                    console.log(`Failed to buy emote: ${Emote[emote]}`);
-                }
+                this.buyEmote(emote);
             }
         });
+    }
+
+    private buyEmote(emote: Emote) {
+        if (this.player.buyEmote(emote)) {
+            console.log(`Bought emote: ${Emote[emote]}`);
+            this.game.getSoundManager().playBuyEmoteSound();
+        } else {
+            console.log(`Not enough gold to buy emote: ${Emote[emote]}`);
+        }
     }
 
     private getEmoteText(emote: Emote): string {

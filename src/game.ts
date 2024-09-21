@@ -6,6 +6,7 @@ import { AlternateDimension, DimensionType } from './alternateDimension';
 import { TitleScreen } from './titleScreen';
 import { CloudMob } from './cloudMob';
 import { BumbleBee } from './bumbleBee';
+import { SoundManager } from './soundManager';
 
 export class Game {
     private canvas: HTMLCanvasElement;
@@ -40,6 +41,7 @@ export class Game {
     private cloudMobs: CloudMob[] = [];
     private maxCloudMobs: number = 20;
     private lastDamageSource: 'bee' | 'cloud' | 'enemy' | 'unknown' = 'unknown';
+    private soundManager: SoundManager;
 
     constructor(canvasId: string, titleScreen: TitleScreen) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -69,7 +71,8 @@ export class Game {
             100,
             10,
             this.context,
-            this.terrain
+            this.terrain,
+            this
         );
 
         this.score = 0;
@@ -79,10 +82,12 @@ export class Game {
         this.lastHealthRecoveryTime = Date.now();
         this.enemies = [];
         this.spawnEnemies(20);
-        this.shop = new Shop(this.player, this.context);
+        this.shop = new Shop(this.player, this.context, this);
         this.alternateDimension = new AlternateDimension(10000, 10000, this.context, DimensionType.Dark, this.player, this.terrain);
         this.grassDimension = new AlternateDimension(10000, 10000, this.context, DimensionType.Grass, this.player, this.terrain);
         this.titleScreen = titleScreen;
+        this.soundManager = new SoundManager();
+        this.soundManager.playBackgroundMusic();
 
         this.init();
     }
@@ -299,6 +304,7 @@ export class Game {
         }
 
         if (this.player.isDead()) {
+            this.soundManager.playHurtSound();
             this.handlePlayerDeath();
             return;
         }
@@ -400,7 +406,7 @@ export class Game {
         for (let i = 0; i < count; i++) {
             const x = Math.random() * this.terrain.getWidth();
             const y = Math.random() * this.terrain.getHeight();
-            const enemy = new Enemy(x, y, this.terrain.getWidth(), this.terrain.getHeight(), this.context, this.player, this.terrain);
+            const enemy = new Enemy(x, y, this.terrain.getWidth(), this.terrain.getHeight(), this.context, this.player, this.terrain, this);
             this.enemies.push(enemy);
         }
     }
@@ -527,6 +533,7 @@ export class Game {
 
     private toggleDimension() {
         if (this.portalCooldown === 0) {
+            this.soundManager.playPortalSound();
             switch (this.currentDimension) {
                 case 'normal':
                     this.currentDimension = 'alternate';
@@ -536,6 +543,7 @@ export class Game {
                     break;
                 case 'alternate':
                     this.currentDimension = 'grass';
+                    this.player.setInAlternateDimension(true); // Still in an alternate dimension
                     const grassDimensionPortal = this.grassDimension!.getRegularPortalLocation();
                     this.player.setPosition(grassDimensionPortal.x, grassDimensionPortal.y);
                     break;
@@ -798,5 +806,15 @@ export class Game {
                 }
             }
         });
+    }
+
+    // Add a new method to handle item collection
+    public collectItem(itemType: string) {
+        this.soundManager.playCollectSound();
+        // Add any other item collection logic here
+    }
+
+    public getSoundManager(): SoundManager {
+        return this.soundManager;
     }
 }
